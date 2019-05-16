@@ -1015,36 +1015,30 @@ void mpm::Node<Tdim, Tdof, Tnphases>::compute_normal_vector(
   // Compute the normal vector by "Average Volume Gradient (AVG)" method
 }
 
-//! Compute contact components
+//! Compute tangent vector of contact interface of a subdomain
 template <unsigned Tdim, unsigned Tdof, unsigned Tnphases>
-void mpm::Node<Tdim, Tdof, Tnphases>::compute_contact_components(
-    const Eigen::Matrix<double, Tdim, 1> separation_vector,
-    double* separation_normal_length, double* separation_tangent_length,
-    unsigned mid) {
+void mpm::Node<Tdim, Tdof, Tnphases>::compute_tangent_vector(
+    const Eigen::Matrix<double, Tdim, 1> momentum_difference, unsigned mid) {
   const double tolerance = 1.0E-15;
-  // Compute the length of the separation vector in normal directions
-  (*separation_normal_length) =
-      separation_vector.dot(this->normal_vector_.at(mid));
-  // Compute the separation vector in normal direction
-  Eigen::Matrix<double, Tdim, 1> separation_normal =
-      (*separation_normal_length) * this->normal_vector_.at(mid);
-  // Compute the separation vector in tangent direction
-  Eigen::Matrix<double, Tdim, 1> separation_tangent =
-      separation_vector - separation_normal;
-  // Compute the length of the separation vector in tangent directions
+  // Compute the tangent vector without normalization
+  this->tangent_vector_.at(mid) =
+      (momentum_difference.dot(this->normal_vector_.at(mid))) *
+          momentum_difference -
+      momentum_difference;
+  double tangent_vector_length = 0.;
   if (Tdim == 2)
-    (*separation_tangent_length) =
-        sqrt(separation_tangent(0) * separation_tangent(0) +
-             separation_tangent(1) * separation_tangent(1));
+    tangent_vector_length = sqrt(
+        this->tangent_vector_.at(mid)(0) * this->tangent_vector_.at(mid)(0) +
+        this->tangent_vector_.at(mid)(1) * this->tangent_vector_.at(mid)(1));
   if (Tdim == 3)
-    (*separation_tangent_length) =
-        sqrt(separation_tangent(0) * separation_tangent(0) +
-             separation_tangent(1) * separation_tangent(1) +
-             separation_tangent(2) * separation_tangent(2));
+    tangent_vector_length = sqrt(
+        this->tangent_vector_.at(mid)(0) * this->tangent_vector_.at(mid)(0) +
+        this->tangent_vector_.at(mid)(1) * this->tangent_vector_.at(mid)(1) +
+        this->tangent_vector_.at(mid)(2) * this->tangent_vector_.at(mid)(2));
   // Compute the normalized tangent vector
-  if ((*separation_tangent_length) > tolerance)
+  if (tangent_vector_length > tolerance)
     this->tangent_vector_.at(mid) =
-        separation_tangent / (*separation_tangent_length);
+        this->tangent_vector_.at(mid) / tangent_vector_length;
 }
 
 //! Compute correction momentum
@@ -1052,7 +1046,7 @@ template <unsigned Tdim, unsigned Tdof, unsigned Tnphases>
 void mpm::Node<Tdim, Tdof, Tnphases>::compute_correction_momentum(
     const std::string friction_type, const double friction_coefficient,
     const Eigen::Matrix<double, Tdim, 1> momentum_difference,
-    const double separation_normal_length, unsigned mid) {
+    const double separation_normal, unsigned mid) {
   const double tolerance = 1.0E-15;
   // Initialise correction momentum
   Eigen::Matrix<double, Tdim, 1> momentum_correction = momentum_difference;
@@ -1088,29 +1082,19 @@ void mpm::Node<Tdim, Tdof, Tnphases>::compute_correction_momentum(
 //! Compute contact force
 template <unsigned Tdim, unsigned Tdof, unsigned Tnphases>
 void mpm::Node<Tdim, Tdof, Tnphases>::compute_contact_force(
-    const double separation_normal_length,
-    const double separation_tangent_length, const double separation_cut_off,
-    const double dc_n, const double dc_t, unsigned mid) {
-  Eigen::Matrix<double, Tdim, Tdim> dn_, dt_;
-  dn_.setZero();
-  dt_.setZero();
-  dn_(0, 0) = dc_n;
-  dn_(1, 1) = dc_n;
-  dt_(0, 0) = dc_t;
-  dt_(1, 1) = dc_t;
-  if (Tdim == 3) {
-    dn_(2, 2) = dc_n;
-    dt_(2, 2) = dc_t;
-  }
+    const double separation_normal, const double separation_cut_off,
+    const double dc_n, const double friction_coefficient, unsigned mid) {
   double ai = 100;
-  Eigen::Matrix<double, Tdim, Tnphases> internal_force_subdomain =
-      this->internal_force_subdomain_.at(mid);
-  internal_force_subdomain.col(0) -=
-      (dn_ * (fabs(separation_cut_off - separation_normal_length) *
-              this->normal_vector_.at(mid)) +
-       dt_ * (separation_tangent_length * this->tangent_vector_.at(mid))) *
+  Eigen::Matrix<double, Tdim, Tnphases> external_force_subdomain =
+      this->external_force_subdomain_.at(mid);
+  double contact_force_normal =
+      dc_n * fabs(separation_cut_off - separation_normal);
+  external_force_subdomain.col(0) -=
+      (contact_force_normal * this->normal_vector_.at(mid) +
+       friction_coefficient * contact_force_normal *
+           this->tangent_vector_.at(mid)) *
       ai;
-  this->internal_force_subdomain_.at(mid) = internal_force_subdomain;
+  this->external_force_subdomain_.at(mid) = external_force_subdomain;
 }
 
 //! Compute contact interface on node
@@ -1118,7 +1102,7 @@ template <unsigned Tdim, unsigned Tdof, unsigned Tnphases>
 void mpm::Node<Tdim, Tdof, Tnphases>::compute_contact_interface(
     bool contact_force, const std::string friction_type,
     const double friction_coefficient, const double separation_cut_off,
-    const double dc_n, const double dc_t, unsigned mid) {
+    const double dc_n, unsigned mid) {
   const double tolerance = 1.0E-12;
   // Check if there is any subdomain particle
   if (mass_subdomain_.at(mid)(0) > tolerance &&
@@ -1132,28 +1116,23 @@ void mpm::Node<Tdim, Tdof, Tnphases>::compute_contact_interface(
         mass_(0) / (mass_(0) - mass_subdomain_.at(mid)(0)) *
         (coordinates_from_particles_ -
          coordinates_from_particles_subdomain_.at(mid));
+    // Compute the length of the separation vector in normal directions
+    double separation_normal =
+        separation_vector.dot(this->normal_vector_.at(mid));
     // Detect contact
     if (momentum_difference.dot(this->normal_vector_.at(mid)) < -1.0E-15 &&
-        separation_vector.dot(this->normal_vector_.at(mid)) <
-            separation_cut_off) {
-      // Normal length of separation vector
-      double separation_normal_length = 0;
-      // Tangent length of separation vector
-      double separation_tangent_length = 0;
-      // Compute contact components
-      this->compute_contact_components(separation_vector,
-                                       &separation_normal_length,
-                                       &separation_tangent_length, mid);
+        separation_normal < separation_cut_off) {
+      // Compute tangent vector of contact interface
+      this->compute_tangent_vector(momentum_difference, mid);
       //! Contact_force FALSE: Modify subdomain momentume
       if (!contact_force)
         this->compute_correction_momentum(friction_type, friction_coefficient,
                                           momentum_difference,
-                                          separation_normal_length, mid);
+                                          separation_normal, mid);
       //! Contact_force TRUE: Implement contact force
       if (contact_force)
-        this->compute_contact_force(separation_normal_length,
-                                    separation_tangent_length,
-                                    separation_cut_off, dc_n, dc_t, mid);
+        this->compute_contact_force(separation_normal, separation_cut_off, dc_n,
+                                    friction_coefficient, mid);
     }
   }
 }

@@ -201,7 +201,7 @@ bool mpm::MPMExplicit<Tdim>::solve() {
                       io_->analysis()["contact"]["contact_force"],
                       sub["friction_type"], sub["friction_coefficient"],
                       io_->analysis()["contact"]["separation_cut_off"],
-                      sub["dc_n"], sub["dc_t"], sub["material_id"]),
+                      sub["dc_n"], sub["material_id"]),
             std::bind(&mpm::NodeBase<Tdim>::status, std::placeholders::_1));
       }
 

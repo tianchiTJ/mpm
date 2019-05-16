@@ -311,54 +311,46 @@ class Node : public NodeBase<Tdim> {
                              const VectorDim normal_vector,
                              unsigned mid) override;
 
-  //! Compute contact components
-  //! \param[in] separation_vector Separation vector
-  //! \param[in] separation_normal_length Length of separation vector in normal
-  //! direction \param[in] separation_tangent_length Length of separation vector
-  //! in tangent direction
+  //! Compute tangent vector of contact interface of a subdomain
+  //! \param[in] momentum_difference Momentum difference
   //! \param[in] mid Subdomain id (material id)
-  void compute_contact_components(
-      const Eigen::Matrix<double, Tdim, 1> separation_vector,
-      double* separation_normal_length, double* separation_tangent_length,
+  void compute_tangent_vector(
+      const Eigen::Matrix<double, Tdim, 1> momentum_difference,
       unsigned mid) override;
 
   //! Compute correction momentum
   //! \param[in] friction_type Iterface friction type (rough or frictional)
   //! \param[in] friction_coefficient Friction coefficient
-  //! \param[in] momentum_difference Difference between total momentum and
-  //! subdomain momentum \param[in] separation_normal_length Length of
-  //! separation vector in normal direction
+  //! \param[in] momentum_difference Momentum difference
+  //! \param[in] separation_normal Normal separation
   //! \param[in] mid Subdomain id (material id)
   void compute_correction_momentum(
       const std::string friction_type, const double friction_coefficient,
       const Eigen::Matrix<double, Tdim, 1> momentum_difference,
-      const double separation_normal_length, unsigned mid) override;
+      const double separation_normal, unsigned mid) override;
 
   //! Compute contact force
-  //! \param[in] separation_normal_length Length of separation vector in normal
-  //! direction \param[in] separation_normal_length Length of separation vector
+  //! \param[in] separation_normal Normal separation
   //! \param[in] separation_cut_off Cut off value of separation check
   //! \param[in] dc_n Normal contact stiffness
-  //! \param[in] dc_t Tangent contact stiffness
-  //! in tangent direction \param[in] mid Subdomain id (material id)
-  void compute_contact_force(const double separation_normal_length,
-                             const double separation_tangent_length,
+  //! \param[in] friction_coefficient Friction coefficient
+  //! \param[in] mid Subdomain id (material id)
+  void compute_contact_force(const double separation_normal,
                              const double separation_cut_off, const double dc_n,
-                             const double dc_t, unsigned mid) override;
+                             const double friction_coefficient,
+                             unsigned mid) override;
 
   //! Compute contact interface on node
   //! \param[in] friction_type Iterface friction type (rough or frictional)
   //! \param[in] friction_coefficient Friction coefficient
   //! \param[in] separation_cut_off Cut off value of separation check
   //! \param[in] dc_n Normal contact stiffness
-  //! \param[in] dc_t Tangent contact stiffness
   //! \param[in] mid Material id of subdomain
   void compute_contact_interface(bool contact_force,
                                  const std::string friction_type,
                                  const double friction_coefficient,
                                  const double separation_cut_off,
-                                 const double dc_n, const double dc_t,
-                                 unsigned mid) override;
+                                 const double dc_n, unsigned mid) override;
 
  private:
   //! Mutex
