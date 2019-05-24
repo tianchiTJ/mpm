@@ -90,6 +90,13 @@ bool mpm::MPMExplicit<Tdim>::solve() {
     // Create a TBB task group
     tbb::task_group task_group;
 
+    if (step_ > 0) this->add_new_particles(step_);
+
+    // Iterate over each particle to assign material
+    mesh_->iterate_over_particles(
+        std::bind(&mpm::ParticleBase<Tdim>::assign_material,
+                  std::placeholders::_1, material));
+
     // Spawn a task for initialising nodes and cells
     task_group.run([&] {
       // Initialise nodes

@@ -347,6 +347,12 @@ std::vector<std::shared_ptr<mpm::ParticleBase<Tdim>>>
   return particles;
 }
 
+//! Locate new particle in a cell
+template <unsigned Tdim>
+void mpm::Mesh<Tdim>::locate_new_particle_cell(const mpm::Index id){
+  this->locate_particle_cells(map_particles_[id]);
+}
+
 //! Locate particles in a cell
 template <unsigned Tdim>
 bool mpm::Mesh<Tdim>::locate_particle_cells(
@@ -714,6 +720,23 @@ bool mpm::Mesh<Tdim>::assign_particles_stresses(
       (*pitr)->initial_stress(phase, particle_stresses.at(i));
       ++i;
     }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Assign new particles stresses
+template <unsigned Tdim>
+bool mpm::Mesh<Tdim>::assign_new_particles_stresses(
+    const mpm::Index id, const Eigen::Matrix<double, 6, 1> particle_stresses) {
+  bool status = true;
+  // TODO: Remove phase
+  const unsigned phase = 0;
+  try {
+    auto pitr = map_particles_[id];
+    pitr->initial_stress(phase, particle_stresses);
   } catch (std::exception& exception) {
     console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
     status = false;

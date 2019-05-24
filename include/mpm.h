@@ -45,6 +45,9 @@ class MPM {
   // Initialise particles
   virtual bool initialise_particles() = 0;
 
+  //
+  virtual bool add_new_particles(unsigned step) = 0;
+
   // Initialise materials
   virtual bool initialise_materials() = 0;
 

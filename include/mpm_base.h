@@ -37,6 +37,9 @@ class MPMBase : public MPM {
   //! Initialise particles
   bool initialise_particles() override;
 
+  //
+  bool add_new_particles(unsigned step) override;
+
   //! Initialise materials
   bool initialise_materials() override;
 

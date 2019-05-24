@@ -189,6 +189,9 @@ class Mesh {
   //! \retval particles Particles which cannot be located in the mesh
   std::vector<std::shared_ptr<mpm::ParticleBase<Tdim>>> locate_particles_mesh();
 
+  //
+  void locate_new_particle_cell(const mpm::Index id);
+
   //! Iterate over particles
   //! \tparam Toper Callable object typically a baseclass functor
   template <typename Toper>
@@ -261,6 +264,10 @@ class Mesh {
   //! \param[in] particle_stresses Initial stresses of particle
   bool assign_particles_stresses(
       const std::vector<Eigen::Matrix<double, 6, 1>>& particle_stresses);
+
+  //
+  bool assign_new_particles_stresses(
+      const mpm::Index id, const Eigen::Matrix<double, 6, 1> particle_stresses);
 
   //! Assign particles cells
   //! \param[in] particles_cells Particles and cells
