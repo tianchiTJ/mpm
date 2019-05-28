@@ -349,7 +349,7 @@ std::vector<std::shared_ptr<mpm::ParticleBase<Tdim>>>
 
 //! Locate new particle in a cell
 template <unsigned Tdim>
-void mpm::Mesh<Tdim>::locate_new_particle_cell(const mpm::Index id){
+void mpm::Mesh<Tdim>::locate_new_particle_cell(const mpm::Index id) {
   this->locate_particle_cells(map_particles_[id]);
 }
 

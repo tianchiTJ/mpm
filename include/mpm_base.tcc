@@ -412,27 +412,31 @@ bool mpm::MPMBase<Tdim>::add_new_particles(unsigned step) {
 
   try {
     // Get new particles
-    std::vector<Eigen::Matrix<double, Tdim, 1>> new_particles;
     Eigen::Matrix<double, Tdim, 1> new_particle;
     new_particle.setZero();
     new_particle(0) = 0.5;
     new_particle(1) = 0.5;
-    new_particles[0] = new_particle;
     // Get new particles ids
-    std::vector<mpm::Index> new_particles_ids;
     mpm::Index new_particle_id = 35 + step;
-    new_particles_ids[0] = new_particle_id;
     // Get particle properties
     auto particle_props = io_->json_object("particle");
     // Particle type
     const auto particle_type =
         particle_props["particle_type"].template get<std::string>();
     // Create particles from file
-    bool particle_status =
-        mesh_->create_particles(new_particles_ids,  // global id
-                                particle_type,      // particle type
-                                new_particles,      // coordinates
-                                true);              // Check duplicates
+    // bool particle_status =
+    //    mesh_->create_particles(new_particles_ids,  // global id
+    //                            particle_type,      // particle type
+    //                            new_particles,      // coordinates
+    //                            true);              // Check duplicates
+
+    //
+    bool insert_status = mesh_->add_particle(
+        Factory<mpm::ParticleBase<Tdim>, mpm::Index,
+                const Eigen::Matrix<double, Tdim, 1>&>::instance()
+            ->create(particle_type, static_cast<mpm::Index>(new_particle_id),
+                     new_particle),
+        true);
 
     mesh_->locate_new_particle_cell(new_particle_id);
     // Compute volume of new particle
@@ -442,13 +446,14 @@ bool mpm::MPMBase<Tdim>::add_new_particles(unsigned step) {
 
     // Assign new particles stresses
     Eigen::Matrix<double, 6, 1> new_particle_stresses;
-    new_particle_stresses(0) = -100;
-    new_particle_stresses(1) = -100;
-    new_particle_stresses(2) = -100;
+    new_particle_stresses(0) = -1E10;
+    new_particle_stresses(1) = -1E10;
+    new_particle_stresses(2) = -1E10;
     new_particle_stresses(3) = 0;
     new_particle_stresses(4) = 0;
     new_particle_stresses(5) = 0;
-    mesh_->assign_new_particles_stresses(new_particle_id, new_particle_stresses);
+    mesh_->assign_new_particles_stresses(new_particle_id,
+                                         new_particle_stresses);
   } catch (std::exception& exception) {
     console_->error("#{}: Reading particles: {}", __LINE__, exception.what());
     status = false;
