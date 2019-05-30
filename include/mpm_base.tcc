@@ -411,15 +411,19 @@ bool mpm::MPMBase<Tdim>::add_new_particles(unsigned step) {
   bool status = true;
 
   try {
-    // Get new particles
-    Eigen::Matrix<double, Tdim, 1> new_particle;
-    new_particle.setZero();
-    new_particle(0) = 0.5;
-    new_particle(1) = 0.5;
-    // Get new particles ids
-    mpm::Index new_particle_id = 35 + step;
     // Get particle properties
     auto particle_props = io_->json_object("particle");
+    // Get coordinates of added particle
+    Eigen::Matrix<double, Tdim, 1> new_particle;
+    new_particle.setZero();
+    for (unsigned i = 0; i < Tdim; ++i) {
+      new_particle[i] = particle_props.at("add_particle_coordinates").at(i);
+    }
+    // Get new particles ids
+    mpm::Index add_particle_start_id =
+        particle_props.at("add_particle_start_id");
+    mpm::Index new_particle_id = add_particle_start_id + step;
+
     // Particle type
     const auto particle_type =
         particle_props["particle_type"].template get<std::string>();
@@ -440,15 +444,15 @@ bool mpm::MPMBase<Tdim>::add_new_particles(unsigned step) {
 
     mesh_->locate_new_particle_cell(new_particle_id);
     // Compute volume of new particle
-    mesh_->iterate_over_particles(
-        std::bind(&mpm::ParticleBase<Tdim>::compute_volume,
-                  std::placeholders::_1, phase));
+    double volume = particle_props.at("add_particle_volume");
+    mesh_->assign_particle_volume(new_particle_id, volume);
 
     // Assign new particles stresses
+    double grouting_pressure = particle_props.at("add_particle_pressure");
     Eigen::Matrix<double, 6, 1> new_particle_stresses;
-    new_particle_stresses(0) = -1E10;
-    new_particle_stresses(1) = -1E10;
-    new_particle_stresses(2) = -1E10;
+    new_particle_stresses(0) = -grouting_pressure;
+    new_particle_stresses(1) = -grouting_pressure;
+    new_particle_stresses(2) = -grouting_pressure;
     new_particle_stresses(3) = 0;
     new_particle_stresses(4) = 0;
     new_particle_stresses(5) = 0;

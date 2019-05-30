@@ -242,6 +242,11 @@ class Mesh {
   bool assign_particles_volumes(
       const std::vector<std::tuple<mpm::Index, double>>& particle_volumes);
 
+  //! Assign particle volume
+  //! \param[in] pid Particle id
+  //! \param[in] volumes Volume of particle
+  bool assign_particle_volume(const mpm::Index pid, const double volume);
+
   //! Assign particles tractions
   //! \param[in] particle_tractions Traction at dir on particle
   bool assign_particles_tractions(

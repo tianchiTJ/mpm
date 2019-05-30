@@ -570,6 +570,24 @@ bool mpm::Mesh<Tdim>::assign_particles_volumes(
   return status;
 }
 
+//! Assign particle volume
+template <unsigned Tdim>
+bool mpm::Mesh<Tdim>::assign_particle_volume(const mpm::Index pid,
+                                             const double volume) {
+  bool status = true;
+  const unsigned phase = 0;
+  try {
+    if (map_particles_.find(pid) != map_particles_.end())
+      status = map_particles_[pid]->assign_volume(phase, volume);
+    if (!status)
+      throw std::runtime_error("Cannot assign invalid particle volume");
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
 //! Compute and assign rotation matrix to nodes
 template <unsigned Tdim>
 bool mpm::Mesh<Tdim>::compute_nodal_rotation_matrices(
