@@ -38,7 +38,7 @@ class MPMBase : public MPM {
   bool initialise_particles() override;
 
   //
-  bool add_new_particles(unsigned step) override;
+  bool add_new_particles(mpm::Index new_particle_id) override;
 
   //! Initialise materials
   bool initialise_materials() override;

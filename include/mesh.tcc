@@ -762,6 +762,21 @@ bool mpm::Mesh<Tdim>::assign_new_particles_stresses(
   return status;
 }
 
+//! Assign new particle stresses
+template <unsigned Tdim>
+bool mpm::Mesh<Tdim>::assign_new_particle_material(
+    const mpm::Index id, const std::shared_ptr<Material<Tdim>>& material) {
+  bool status = true;
+  try {
+    auto pitr = map_particles_[id];
+    pitr->assign_material(material);
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
 //! Assign particle cells
 template <unsigned Tdim>
 bool mpm::Mesh<Tdim>::assign_particles_cells(

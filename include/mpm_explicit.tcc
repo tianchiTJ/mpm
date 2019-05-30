@@ -82,6 +82,12 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   if (resume) this->checkpoint_resume();
 
   auto solver_begin = std::chrono::steady_clock::now();
+
+  // counter of new particle
+  unsigned counter_new_particle = 0;
+  // Get interval of adding particle
+  mpm::Index step_inv = particle_props.at("add_particle_step_interval");
+
   // Main loop
   for (; step_ < nsteps_; ++step_) {
 
@@ -90,12 +96,22 @@ bool mpm::MPMExplicit<Tdim>::solve() {
     // Create a TBB task group
     tbb::task_group task_group;
 
-    if (step_ > 0) this->add_new_particles(step_);
-
-    // Iterate over each particle to assign material
-    mesh_->iterate_over_particles(
-        std::bind(&mpm::ParticleBase<Tdim>::assign_material,
-                  std::placeholders::_1, material));
+    // Add new particle
+    if ((step_ % step_inv) == 0) {
+      // Get new particles ids
+      mpm::Index add_particle_start_id =
+          particle_props.at("add_particle_start_id");
+      mpm::Index new_particle_id = add_particle_start_id + counter_new_particle;
+      this->add_new_particles(new_particle_id);
+      // Assign material to new particle
+      // Get material from list of materials
+      const auto add_particle_material_id =
+          particle_props["add_particle_material_id"].template get<unsigned>();
+      auto new_particle_material = materials_.at(add_particle_material_id);
+      mesh_->assign_new_particle_material(new_particle_id,
+                                          new_particle_material);
+      counter_new_particle++;
+    }
 
     // Spawn a task for initialising nodes and cells
     task_group.run([&] {

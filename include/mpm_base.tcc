@@ -405,7 +405,7 @@ bool mpm::MPMBase<Tdim>::initialise_particles() {
 
 // Add new particles
 template <unsigned Tdim>
-bool mpm::MPMBase<Tdim>::add_new_particles(unsigned step) {
+bool mpm::MPMBase<Tdim>::add_new_particles(mpm::Index new_particle_id) {
   // TODO: Fix phase
   const unsigned phase = 0;
   bool status = true;
@@ -419,10 +419,6 @@ bool mpm::MPMBase<Tdim>::add_new_particles(unsigned step) {
     for (unsigned i = 0; i < Tdim; ++i) {
       new_particle[i] = particle_props.at("add_particle_coordinates").at(i);
     }
-    // Get new particles ids
-    mpm::Index add_particle_start_id =
-        particle_props.at("add_particle_start_id");
-    mpm::Index new_particle_id = add_particle_start_id + step;
 
     // Particle type
     const auto particle_type =

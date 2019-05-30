@@ -274,6 +274,10 @@ class Mesh {
   bool assign_new_particles_stresses(
       const mpm::Index id, const Eigen::Matrix<double, 6, 1> particle_stresses);
 
+  //
+  bool assign_new_particle_material(
+      const mpm::Index id, const std::shared_ptr<Material<Tdim>>& material);
+
   //! Assign particles cells
   //! \param[in] particles_cells Particles and cells
   bool assign_particles_cells(
