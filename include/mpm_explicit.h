@@ -1,7 +1,23 @@
 #ifndef MPM_MPM_EXPLICIT_H_
 #define MPM_MPM_EXPLICIT_H_
 
-#include "mpm_base.h"
+#include <numeric>
+
+#include <boost/lexical_cast.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+
+// MPI
+#ifdef USE_MPI
+#include "mpi.h"
+#endif
+#include "tbb/task_group.h"
+
+#include "container.h"
+#include "mpi_wrapper.h"
+#include "mpm.h"
+#include "particle.h"
 
 namespace mpm {
 
@@ -10,46 +26,72 @@ namespace mpm {
 //! \details A single-phase explicit MPM
 //! \tparam Tdim Dimension
 template <unsigned Tdim>
-class MPMExplicit : public MPMBase<Tdim> {
+class MPMExplicit : public MPM {
  public:
   //! Default constructor
   MPMExplicit(std::unique_ptr<IO>&& io);
 
+  //! Initialise mesh
+  bool initialise_mesh() override;
+
+  //! Initialise particles
+  bool initialise_particles() override;
+
+  //! Initialise materials
+  bool initialise_materials() override;
+
+  //! Apply nodal tractions
+  bool apply_nodal_tractions() override;
+
+  //! Apply properties to particles sets (e.g: material)
+  bool apply_properties_to_particles_sets() override;
+
   //! Solve
   bool solve() override;
 
+  //! Checkpoint resume
+  bool checkpoint_resume() override;
+
+#ifdef USE_VTK
+  //! Write VTK files
+  void write_vtk(mpm::Index step, mpm::Index max_steps) override;
+#endif
+
+  //! Write HDF5 files
+  void write_hdf5(mpm::Index step, mpm::Index max_steps) override;
+
  protected:
   // Generate a unique id for the analysis
-  using mpm::MPMBase<Tdim>::uuid_;
+  using mpm::MPM::uuid_;
   //! Time step size
-  using mpm::MPMBase<Tdim>::dt_;
+  using mpm::MPM::dt_;
   //! Current step
-  using mpm::MPMBase<Tdim>::step_;
+  using mpm::MPM::step_;
   //! Number of steps
-  using mpm::MPMBase<Tdim>::nsteps_;
+  using mpm::MPM::nsteps_;
   //! Output steps
-  using mpm::MPMBase<Tdim>::output_steps_;
+  using mpm::MPM::output_steps_;
   //! A unique ptr to IO object
-  using mpm::MPMBase<Tdim>::io_;
+  using mpm::MPM::io_;
   //! JSON analysis object
-  using mpm::MPMBase<Tdim>::analysis_;
+  using mpm::MPM::analysis_;
   //! JSON post-process object
-  using mpm::MPMBase<Tdim>::post_process_;
+  using mpm::MPM::post_process_;
   //! Logger
-  using mpm::MPMBase<Tdim>::console_;
+  using mpm::MPM::console_;
 
   //! velocity update
-  using mpm::MPMBase<Tdim>::velocity_update_;
+  bool velocity_update_{false};
   //! Gravity
-  using mpm::MPMBase<Tdim>::gravity_;
+  Eigen::Matrix<double, Tdim, 1> gravity_;
   //! Mesh object
-  using mpm::MPMBase<Tdim>::mesh_;
+  std::unique_ptr<mpm::Mesh<Tdim>> mesh_;
   //! Materials
-  using mpm::MPMBase<Tdim>::materials_;
+  std::map<unsigned, std::shared_ptr<mpm::Material<Tdim>>> materials_;
   //! VTK attributes
-  using mpm::MPMBase<Tdim>::vtk_attributes_;
+  std::vector<std::string> vtk_attributes_;
   //! Bool nodal tractions
-  using mpm::MPMBase<Tdim>::nodal_tractions_;
+  bool nodal_tractions_{true};
 
  private:
   //! Boolean to switch between USL and USF
