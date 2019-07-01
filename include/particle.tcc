@@ -90,11 +90,13 @@ void mpm::Particle<Tdim, Tnphases>::initialise() {
   natural_size_.setZero();
   strain_rate_.setZero();
   strain_.setZero();
+  plastic_strain_.setZero();
   stress_.setZero();
   traction_.setZero();
   velocity_.setZero();
   volume_.fill(std::numeric_limits<double>::max());
   volumetric_strain_centroid_.setZero();
+  coordinates_reference_ = coordinates_;
 }
 
 // Assign a cell to particle
@@ -454,6 +456,21 @@ bool mpm::Particle<Tdim, Tnphases>::compute_stress(unsigned phase) {
       // Calculate stress
       this->stress_.col(phase) = material_.at(phase)->compute_stress(
           this->stress_.col(phase), dstrain, this, &state_variables_);
+      // Update plastic strain
+      if (state_variables_.find("plastic_strain0") != state_variables_.end()) {
+        this->plastic_strain_(0, phase) =
+            state_variables_.at("plastic_strain0");
+        this->plastic_strain_(1, phase) =
+            state_variables_.at("plastic_strain1");
+        this->plastic_strain_(2, phase) =
+            state_variables_.at("plastic_strain2");
+        this->plastic_strain_(3, phase) =
+            state_variables_.at("plastic_strain3");
+        this->plastic_strain_(4, phase) =
+            state_variables_.at("plastic_strain4");
+        this->plastic_strain_(5, phase) =
+            state_variables_.at("plastic_strain5");
+      }
     } else {
       throw std::runtime_error("Material is invalid");
     }

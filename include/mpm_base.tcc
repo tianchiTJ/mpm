@@ -57,7 +57,9 @@ mpm::MPMBase<Tdim>::MPMBase(std::unique_ptr<IO>&& io)
   }
 
   // Default VTK attributes
-  std::vector<std::string> vtk = {"velocities", "stresses", "strains"};
+  std::vector<std::string> vtk = {
+      "displacements", "velocities",    "stresses", "shear_stresses",
+      "strains",       "shear_strains", "epds"};
   try {
     if (post_process_.at("vtk").is_array() &&
         post_process_.at("vtk").size() > 0) {
@@ -475,29 +477,32 @@ bool mpm::MPMBase<Tdim>::apply_nodal_tractions() {
   return status;
 }
 
-//! Apply properties to particles sets (e.g: material)
+//! Apply properties to particles sets (e.g: material, remove step)
 template <unsigned Tdim>
 bool mpm::MPMBase<Tdim>::apply_properties_to_particles_sets() {
-  bool status = false;
-  // Set phase to zero
   unsigned phase = 0;
-  // Assign material to particle sets
+  bool status = false;
   try {
     // Get particle properties
     auto particle_props = io_->json_object("particle");
     // Get particle sets properties
     auto particle_sets = particle_props["particle_sets"];
-    // Assign material to each particle sets
+    // Iterate over each particle sets
     for (const auto& psets : particle_sets) {
+      // Assign material to particle sets
       // Get set material from list of materials
       auto set_material = materials_.at(psets["material_id"]);
-      // Get sets ids
-      std::vector<unsigned> sids = psets["set_id"];
       // Assign material to particles in the specific sets
-      for (const auto& sitr : sids) {
-        mesh_->iterate_over_particle_set(
-            sitr, std::bind(&mpm::ParticleBase<Tdim>::assign_material,
-                            std::placeholders::_1, phase, set_material));
+      mesh_->iterate_over_particle_set(
+          psets["set_id"],
+          std::bind(&mpm::ParticleBase<Tdim>::assign_material,
+                    std::placeholders::_1, phase, set_material));
+
+      // Assign remove steps to particle sets
+      // Check if remove step is needed
+      if (psets["remove"] == true) {
+        // Add remove step to the map
+        mesh_->create_remove_step(psets["rstep"], psets["set_id"]);
       }
     }
     status = true;
@@ -523,6 +528,9 @@ bool mpm::MPMBase<Tdim>::checkpoint_resume() {
     this->uuid_ = analysis_["resume"]["uuid"].template get<std::string>();
     // Get step
     this->step_ = analysis_["resume"]["step"].template get<mpm::Index>();
+
+    // Initialise remove particles
+    mesh_->resume_remove_particles(step_);
 
     // Input particle h5 file for resume
     std::string attribute = "particles";

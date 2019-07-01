@@ -65,6 +65,12 @@ class ParticleBase {
   //! \retval coordinates_ return coordinates of the particleBase
   VectorDim coordinates() const { return coordinates_; }
 
+  //! Return displacements
+  //! \retval return displacements of the particleBase
+  VectorDim displacements() const {
+    return (coordinates_ - coordinates_reference_);
+  }
+
   //! Compute reference coordinates in a cell
   virtual bool compute_reference_location() = 0;
 
@@ -142,6 +148,9 @@ class ParticleBase {
   //! Strain
   virtual Eigen::Matrix<double, 6, 1> strain(unsigned phase) const = 0;
 
+  //! Plastic strain
+  virtual Eigen::Matrix<double, 6, 1> plastic_strain(unsigned phase) const = 0;
+
   //! Strain rate
   virtual Eigen::Matrix<double, 6, 1> strain_rate(unsigned phase) const = 0;
 
@@ -213,6 +222,8 @@ class ParticleBase {
   Index id_{std::numeric_limits<Index>::max()};
   //! coordinates
   VectorDim coordinates_;
+  //! Initial coordinates
+  VectorDim coordinates_reference_;
   //! Cell id
   Index cell_id_{std::numeric_limits<Index>::max()};
   //! Status

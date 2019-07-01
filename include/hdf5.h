@@ -29,6 +29,9 @@ typedef struct HDF5Particle {
   // Strains
   double strain_xx, strain_yy, strain_zz;
   double gamma_xy, gamma_yz, gamma_xz;
+  // Plastic strains
+  double plastic_strain_xx, plastic_strain_yy, plastic_strain_zz;
+  double plastic_gamma_xy, plastic_gamma_yz, plastic_gamma_xz;
   // Volumetric strain centroid
   double epsilon_v;
   // Status

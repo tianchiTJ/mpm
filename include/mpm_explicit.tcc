@@ -92,6 +92,9 @@ bool mpm::MPMExplicit<Tdim>::solve() {
 
     // Spawn a task for initialising nodes and cells
     task_group.run([&] {
+      // Apply remove step
+      bool remove_status = mesh_->apply_remove_step(step_);
+
       // Initialise nodes
       mesh_->iterate_over_nodes(
           std::bind(&mpm::NodeBase<Tdim>::initialise, std::placeholders::_1));
