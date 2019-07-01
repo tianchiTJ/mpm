@@ -492,6 +492,10 @@ std::vector<Eigen::Matrix<double, 3, 1>> mpm::Mesh<Tdim>::particles_vector_data(
         auto pdata = (*pitr)->strain(phase);
         // Fill stresses to the size of dimensions
         for (unsigned i = 0; i < Tdim; ++i) data(i) = pdata(i + 3);
+      } else if (attribute == "plastic_strains") {
+        auto pdata = (*pitr)->plastic_strain(phase);
+        // Fill stresses to the size of dimensions
+        for (unsigned i = 0; i < Tdim; ++i) data(i) = pdata(i);
       }
       // Velocities
       else if (attribute == "velocities") {
@@ -504,6 +508,10 @@ std::vector<Eigen::Matrix<double, 3, 1>> mpm::Mesh<Tdim>::particles_vector_data(
         auto pdata = (*pitr)->displacements();
         // Fill displacements to the size of dimensions
         for (unsigned i = 0; i < Tdim; ++i) data(i) = pdata(i);
+      } else if (attribute == "epds") {
+        auto pdata = (*pitr)->state_variable("epds");
+        // Fill epds to the size of dimensions
+        for (unsigned i = 0; i < Tdim; ++i) data(i) = pdata;
       }
       // Error
       else
