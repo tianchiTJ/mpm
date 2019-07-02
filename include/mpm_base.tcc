@@ -529,9 +529,6 @@ bool mpm::MPMBase<Tdim>::checkpoint_resume() {
     // Get step
     this->step_ = analysis_["resume"]["step"].template get<mpm::Index>();
 
-    // Initialise remove particles
-    mesh_->resume_remove_particles(step_);
-
     // Input particle h5 file for resume
     std::string attribute = "particles";
     std::string extension = ".h5";
@@ -539,6 +536,10 @@ bool mpm::MPMBase<Tdim>::checkpoint_resume() {
     auto particles_file =
         io_->output_file(attribute, extension, uuid_, step_, this->nsteps_)
             .string();
+
+    // Initialise remove particles
+    mesh_->resume_remove_particles(step_);
+
     // Load particle information from file
     mesh_->read_particles_hdf5(phase, particles_file);
 

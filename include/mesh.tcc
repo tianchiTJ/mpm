@@ -1102,14 +1102,14 @@ bool mpm::Mesh<Tdim>::write_particles_hdf5(unsigned phase,
   field_type[23] = H5T_NATIVE_DOUBLE;
   field_type[24] = H5T_NATIVE_DOUBLE;
   field_type[25] = H5T_NATIVE_DOUBLE;
-  field_type[26] = H5T_NATIVE_HBOOL;
-  field_type[27] = H5T_NATIVE_LLONG;
+  field_type[26] = H5T_NATIVE_DOUBLE;
+  field_type[27] = H5T_NATIVE_DOUBLE;
   field_type[28] = H5T_NATIVE_DOUBLE;
   field_type[29] = H5T_NATIVE_DOUBLE;
   field_type[30] = H5T_NATIVE_DOUBLE;
   field_type[31] = H5T_NATIVE_DOUBLE;
-  field_type[32] = H5T_NATIVE_DOUBLE;
-  field_type[33] = H5T_NATIVE_DOUBLE;
+  field_type[32] = H5T_NATIVE_HBOOL;
+  field_type[33] = H5T_NATIVE_LLONG;
 
   // Create a new file using default properties.
   file_id =
@@ -1365,22 +1365,23 @@ bool mpm::Mesh<Tdim>::resume_remove_particles(const mpm::Index resume_step) {
   for (auto rstep : remove_steps_) {
     // Check remove steps before resume step
     if (rstep.first <= resume_step) {
-      try {
-        for (auto sid : rstep.second) {
-          // Iterate over each particles in the set
-          for (auto particle = particle_sets_.at(sid).cbegin();
-               particle != particle_sets_.at(sid).cend(); particle++) {
-            // Remove particle from the mesh
-            status = this->remove_particle(*particle);
-            if (!status)
-              throw std::runtime_error(
-                  "Initialise removing particle is invalid");
-          }
-        }
-      } catch (std::exception& exception) {
-        console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
-        status = false;
-      }
+      status = this->apply_remove_step(rstep.first);
+      // try {
+      //  for (auto sid : rstep.second) {
+      // Iterate over each particles in the set
+      //    for (auto particle = particle_sets_.at(sid).cbegin();
+      //         particle != particle_sets_.at(sid).cend(); particle++) {
+      // Remove particle from the mesh
+      //      status = this->remove_particle(*particle);
+      //      if (!status)
+      //        throw std::runtime_error(
+      //            "Initialise removing particle is invalid");
+      //    }
+      //  }
+      //} catch (std::exception& exception) {
+      //  console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+      //  status = false;
+      //}
     }
   }
   return status;
