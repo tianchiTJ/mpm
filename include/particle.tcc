@@ -67,6 +67,12 @@ bool mpm::Particle<Tdim, Tnphases>::initialise_particle(
       particle.strain_zz, particle.gamma_xy, particle.gamma_yz,
       particle.gamma_xz;
 
+  // Plastic strain
+  this->plastic_strain_.col(phase) << particle.plastic_strain_xx,
+      particle.plastic_strain_yy, particle.plastic_strain_zz,
+      particle.plastic_gamma_xy, particle.plastic_gamma_yz,
+      particle.plastic_gamma_xz;
+
   // Volumetric strain
   this->volumetric_strain_centroid_(phase) = particle.epsilon_v;
 

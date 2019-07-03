@@ -577,13 +577,17 @@ Eigen::Matrix<double, 6, 1> mpm::MohrCoulomb<Tdim>::compute_stress(
   Vector6d dstress = updated_stress - stress;
   Vector6d dpstrain = dstrain - (this->de_.inverse()) * dstress;
   if (Tdim == 2) dpstrain(4) = dpstrain(5) = 0.;
+  // Phase of solid skeleton
+  unsigned phase = 0;
+  // Plastic strain
+  Vector6d plastic_strain = ptr->plastic_strain(phase);
   // Update plastic strain
-  (*state_vars).at("plastic_strain0") += dpstrain(0);
-  (*state_vars).at("plastic_strain1") += dpstrain(1);
-  (*state_vars).at("plastic_strain2") += dpstrain(2);
-  (*state_vars).at("plastic_strain3") += dpstrain(3);
-  (*state_vars).at("plastic_strain4") += dpstrain(4);
-  (*state_vars).at("plastic_strain5") += dpstrain(5);
+  (*state_vars).at("plastic_strain0") = plastic_strain(0) + dpstrain(0);
+  (*state_vars).at("plastic_strain1") = plastic_strain(1) + dpstrain(1);
+  (*state_vars).at("plastic_strain2") = plastic_strain(2) + dpstrain(2);
+  (*state_vars).at("plastic_strain3") = plastic_strain(3) + dpstrain(3);
+  (*state_vars).at("plastic_strain4") = plastic_strain(4) + dpstrain(4);
+  (*state_vars).at("plastic_strain5") = plastic_strain(5) + dpstrain(5);
   // Update equivalent plastic deviatoric strain
   (*state_vars).at("epds") =
       sqrt(2. / 3. *
