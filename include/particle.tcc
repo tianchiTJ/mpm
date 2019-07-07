@@ -205,7 +205,7 @@ bool mpm::Particle<Tdim, Tnphases>::assign_material(
   try {
     // Check if material is valid and properties are set
     if (material != nullptr) {
-      status = material_.emplace(std::make_pair(phase, material)).second;
+      material_[phase] = material;
       state_variables_ = material_.at(phase)->initialise_state_variables();
     } else {
       throw std::runtime_error("Material is undefined!");
