@@ -117,6 +117,9 @@ class ParticleBase {
   //! Compute mass of particle
   virtual bool compute_mass(unsigned phase) = 0;
 
+  //! Initialse state variables
+  virtual bool initialise_state_variables(unsigned phase) = 0;
+
   //! Map particle mass and momentum to nodes
   virtual bool map_mass_momentum_to_nodes(unsigned phase) = 0;
 

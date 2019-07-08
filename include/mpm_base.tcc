@@ -553,6 +553,11 @@ bool mpm::MPMBase<Tdim>::checkpoint_resume() {
     if (!unlocatable_particles.empty())
       throw std::runtime_error("Particle outside the mesh domain");
 
+    //! Initialse state variables
+    mesh_->iterate_over_particles(
+        std::bind(&mpm::ParticleBase<Tdim>::initialise_state_variables,
+                  std::placeholders::_1, phase));
+
     // Increament step
     ++this->step_;
 

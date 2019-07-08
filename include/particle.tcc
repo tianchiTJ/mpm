@@ -206,7 +206,7 @@ bool mpm::Particle<Tdim, Tnphases>::assign_material(
     // Check if material is valid and properties are set
     if (material != nullptr) {
       material_[phase] = material;
-      state_variables_ = material_.at(phase)->initialise_state_variables();
+      state_variables_ = material_.at(phase)->initialise_state_variables(this);
     } else {
       throw std::runtime_error("Material is undefined!");
     }
@@ -464,18 +464,14 @@ bool mpm::Particle<Tdim, Tnphases>::compute_stress(unsigned phase) {
           this->stress_.col(phase), dstrain, this, &state_variables_);
       // Update plastic strain
       if (state_variables_.find("plastic_strain0") != state_variables_.end()) {
-        this->plastic_strain_(0, phase) =
-            state_variables_.at("plastic_strain0");
-        this->plastic_strain_(1, phase) =
-            state_variables_.at("plastic_strain1");
-        this->plastic_strain_(2, phase) =
-            state_variables_.at("plastic_strain2");
-        this->plastic_strain_(3, phase) =
-            state_variables_.at("plastic_strain3");
-        this->plastic_strain_(4, phase) =
-            state_variables_.at("plastic_strain4");
-        this->plastic_strain_(5, phase) =
-            state_variables_.at("plastic_strain5");
+        Eigen::Matrix<double, 6, 1> plastic_strain;
+        plastic_strain(0) = state_variables_.at("plastic_strain0");
+        plastic_strain(1) = state_variables_.at("plastic_strain1");
+        plastic_strain(2) = state_variables_.at("plastic_strain2");
+        plastic_strain(3) = state_variables_.at("plastic_strain3");
+        plastic_strain(4) = state_variables_.at("plastic_strain4");
+        plastic_strain(5) = state_variables_.at("plastic_strain5");
+        this->plastic_strain_ = plastic_strain;
       }
     } else {
       throw std::runtime_error("Material is invalid");
@@ -483,6 +479,23 @@ bool mpm::Particle<Tdim, Tnphases>::compute_stress(unsigned phase) {
   } catch (std::exception& exception) {
     console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
     status = false;
+  }
+  return status;
+}
+
+//! Initialse state variables
+template <unsigned Tdim, unsigned Tnphases>
+bool mpm::Particle<Tdim, Tnphases>::initialise_state_variables(unsigned phase) {
+  bool status = false;
+  try {
+    // Check if material is valid and properties are set
+    if (material_.at(phase) != nullptr) {
+      state_variables_ = material_.at(phase)->initialise_state_variables(this);
+    } else {
+      throw std::runtime_error("Material is undefined!");
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
   }
   return status;
 }

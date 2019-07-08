@@ -68,6 +68,12 @@ TEST_CASE("Bingham is checked in 2D", "[material][bingham][2D]") {
             "Bingham2D", std::move(id), jmaterial);
     REQUIRE(material->id() == 0);
 
+    // Add particle
+    mpm::Index pid = 0;
+    Eigen::Matrix<double, Dim, 1> coords;
+    coords << 0.5, 0.5;
+    auto particle = std::make_shared<mpm::Particle<Dim, 1>>(pid, coords);
+
     // Get material properties
     REQUIRE(material->property("density") ==
             Approx(jmaterial["density"]).epsilon(Tolerance));
@@ -85,7 +91,8 @@ TEST_CASE("Bingham is checked in 2D", "[material][bingham][2D]") {
 
     // Check if state variable is initialised
     SECTION("State variable is initialised") {
-      mpm::dense_map state_variables = material->initialise_state_variables();
+      mpm::dense_map state_variables =
+          material->initialise_state_variables(particle.get());
       REQUIRE(state_variables.empty() == true);
     }
   }
@@ -408,6 +415,12 @@ TEST_CASE("Bingham is checked in 3D", "[material][bingham][3D]") {
             "Bingham3D", std::move(id), jmaterial);
     REQUIRE(material->id() == 0);
 
+    // Add particle
+    mpm::Index pid = 0;
+    Eigen::Matrix<double, Dim, 1> coords;
+    coords << 0.5, 0.5;
+    auto particle = std::make_shared<mpm::Particle<Dim, 1>>(pid, coords);
+
     // Get material properties
     REQUIRE(material->property("density") ==
             Approx(jmaterial["density"]).epsilon(Tolerance));
@@ -425,7 +438,8 @@ TEST_CASE("Bingham is checked in 3D", "[material][bingham][3D]") {
 
     // Check if state variable is initialised
     SECTION("State variable is initialised") {
-      mpm::dense_map state_variables = material->initialise_state_variables();
+      mpm::dense_map state_variables =
+          material->initialise_state_variables(particle.get());
       REQUIRE(state_variables.empty() == true);
     }
   }

@@ -59,7 +59,9 @@ class Material {
   double property(const std::string& key);
 
   //! Initialise history variables
-  virtual mpm::dense_map initialise_state_variables() = 0;
+  //! \param[in] particle Constant point to particle base
+  virtual mpm::dense_map initialise_state_variables(
+      const ParticleBase<Tdim>* ptr) = 0;
 
   //! Compute thermodynamic pressure
   //! \param[in] volumetric_strain dVolumetric_strain

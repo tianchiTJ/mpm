@@ -55,7 +55,20 @@ mpm::MohrCoulomb<Tdim>::MohrCoulomb(unsigned id,
 
 //! Initialise state variables
 template <unsigned Tdim>
-mpm::dense_map mpm::MohrCoulomb<Tdim>::initialise_state_variables() {
+mpm::dense_map mpm::MohrCoulomb<Tdim>::initialise_state_variables(
+    const ParticleBase<Tdim>* ptr) {
+  const unsigned phase = 0;
+  // Plastic strain
+  const Vector6d plastic_strain = ptr->plastic_strain(phase);
+  // Equivalent plastic deviatoric strain
+  const double epds =
+      (2. / 3. *
+           (pow((plastic_strain(0) - plastic_strain(1)), 2.) +
+            pow((plastic_strain(1) - plastic_strain(2)), 2.) +
+            pow((plastic_strain(2) - plastic_strain(0)), 2.)) +
+       1. / 3. *
+           (pow(plastic_strain(3), 2.) + pow(plastic_strain(4), 2.) +
+            pow(plastic_strain(5), 2.)));
   mpm::dense_map state_vars = {// MC parameters
                                // Friction (phi)
                                {"phi", this->phi_peak_},
@@ -76,14 +89,14 @@ mpm::dense_map mpm::MohrCoulomb<Tdim>::initialise_state_variables() {
                                {"theta", 0.},
                                // Plastic strain
                                // Equivalent plastic deviatoric strain
-                               {"epds", 0.},
+                               {"epds", epds},
                                // Plastic strain components
-                               {"plastic_strain0", 0.},
-                               {"plastic_strain1", 0.},
-                               {"plastic_strain2", 0.},
-                               {"plastic_strain3", 0.},
-                               {"plastic_strain4", 0.},
-                               {"plastic_strain5", 0.}};
+                               {"plastic_strain0", plastic_strain(0)},
+                               {"plastic_strain1", plastic_strain(1)},
+                               {"plastic_strain2", plastic_strain(2)},
+                               {"plastic_strain3", plastic_strain(3)},
+                               {"plastic_strain4", plastic_strain(4)},
+                               {"plastic_strain5", plastic_strain(5)}};
 
   return state_vars;
 }
@@ -579,15 +592,13 @@ Eigen::Matrix<double, 6, 1> mpm::MohrCoulomb<Tdim>::compute_stress(
   if (Tdim == 2) dpstrain(4) = dpstrain(5) = 0.;
   // Phase of solid skeleton
   unsigned phase = 0;
-  // Plastic strain
-  Vector6d plastic_strain = ptr->plastic_strain(phase);
   // Update plastic strain
-  (*state_vars).at("plastic_strain0") = plastic_strain(0) + dpstrain(0);
-  (*state_vars).at("plastic_strain1") = plastic_strain(1) + dpstrain(1);
-  (*state_vars).at("plastic_strain2") = plastic_strain(2) + dpstrain(2);
-  (*state_vars).at("plastic_strain3") = plastic_strain(3) + dpstrain(3);
-  (*state_vars).at("plastic_strain4") = plastic_strain(4) + dpstrain(4);
-  (*state_vars).at("plastic_strain5") = plastic_strain(5) + dpstrain(5);
+  (*state_vars).at("plastic_strain0") += dpstrain(0);
+  (*state_vars).at("plastic_strain1") += dpstrain(1);
+  (*state_vars).at("plastic_strain2") += dpstrain(2);
+  (*state_vars).at("plastic_strain3") += dpstrain(3);
+  (*state_vars).at("plastic_strain4") += dpstrain(4);
+  (*state_vars).at("plastic_strain5") += dpstrain(5);
   // Update equivalent plastic deviatoric strain
   (*state_vars).at("epds") =
       sqrt(2. / 3. *

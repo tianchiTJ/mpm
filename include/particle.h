@@ -121,6 +121,10 @@ class Particle : public ParticleBase<Tdim> {
   //! \param[in] phase Index corresponding to the phase
   bool compute_mass(unsigned phase) override;
 
+  //! Initialse state variables
+  //! \param[in] phase Index corresponding to the phase
+  bool initialise_state_variables(unsigned phase) override;
+
   //! Map particle mass and momentum to nodes
   //! \param[in] phase Index corresponding to the phase
   bool map_mass_momentum_to_nodes(unsigned phase) override;

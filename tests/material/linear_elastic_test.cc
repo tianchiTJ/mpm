@@ -76,7 +76,8 @@ TEST_CASE("LinearElastic is checked in 2D", "[material][linear_elastic][2D]") {
 
     // Check if state variable is initialised
     SECTION("State variable is initialised") {
-      mpm::dense_map state_variables = material->initialise_state_variables();
+      mpm::dense_map state_variables =
+          material->initialise_state_variables(particle.get());
       REQUIRE(state_variables.empty() == true);
     }
   }
@@ -133,7 +134,8 @@ TEST_CASE("LinearElastic is checked in 2D", "[material][linear_elastic][2D]") {
     strain(5) = 0.0000000;
 
     // Compute updated stress
-    mpm::dense_map state_vars = material->initialise_state_variables();
+    mpm::dense_map state_vars =
+        material->initialise_state_variables(particle.get());
     stress =
         material->compute_stress(stress, strain, particle.get(), &state_vars);
 
@@ -237,7 +239,8 @@ TEST_CASE("LinearElastic is checked in 3D", "[material][linear_elastic][3D]") {
 
     // Check if state variable is initialised
     SECTION("State variable is initialised") {
-      mpm::dense_map state_variables = material->initialise_state_variables();
+      mpm::dense_map state_variables =
+          material->initialise_state_variables(particle.get());
       REQUIRE(state_variables.empty() == true);
     }
   }
@@ -296,7 +299,8 @@ TEST_CASE("LinearElastic is checked in 3D", "[material][linear_elastic][3D]") {
     strain(5) = 0.0000000;
 
     // Compute updated stress
-    mpm::dense_map state_vars = material->initialise_state_variables();
+    mpm::dense_map state_vars =
+        material->initialise_state_variables(particle.get());
     stress =
         material->compute_stress(stress, strain, particle.get(), &state_vars);
 

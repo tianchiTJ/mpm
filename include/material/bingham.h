@@ -36,8 +36,10 @@ class Bingham : public Material<Tdim> {
   Bingham& operator=(const Bingham&) = delete;
 
   //! Initialise history variables
+  //! \param[in] particle Constant point to particle base
   //! \retval state_vars State variables with history
-  mpm::dense_map initialise_state_variables() override {
+  mpm::dense_map initialise_state_variables(
+      const ParticleBase<Tdim>* ptr) override {
     mpm::dense_map state_vars;
     return state_vars;
   }
