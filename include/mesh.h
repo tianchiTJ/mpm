@@ -366,6 +366,7 @@ class Mesh {
   //! Container of cells
   Container<Cell<Tdim>> cells_;
   //! Container of remove steps
+  //! (remove step, sets of particle sets)
   tsl::robin_map<mpm::Index, std::vector<unsigned>> remove_steps_;
   //! Faces and cells
   std::multimap<std::vector<mpm::Index>, mpm::Index> faces_cells_;

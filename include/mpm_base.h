@@ -60,6 +60,18 @@ class MPMBase : public MPM {
   //! Write HDF5 files
   void write_hdf5(mpm::Index step, mpm::Index max_steps) override;
 
+  //! Create map of container of change material steps
+  //! \param[in] cmstep Step number of the change material
+  //! \param[in] set_id Set id of particle set changed material at "cmstep"
+  //! \param[in] material_id Material id of the new material
+  void create_change_material_step(const mpm::Index cmstep,
+                                   const unsigned set_id,
+                                   const unsigned material_id);
+
+  //! Apply change material steps
+  //! \param[in] cmstep Step number of the change material
+  bool apply_change_material_step(const mpm::Index cmstep);
+
  private:
   //! Return if a mesh will be isoparametric or not
   //! \retval isoparametric Status of mesh type
@@ -97,6 +109,10 @@ class MPMBase : public MPM {
   std::vector<std::string> vtk_attributes_;
   //! Bool nodal tractions
   bool nodal_tractions_{true};
+  //! Container of change material steps
+  //! (change material step, (material id, sets of particle sets))
+  tsl::robin_map<mpm::Index, tsl::robin_map<mpm::Index, std::vector<unsigned>>>
+      change_material_steps_;
 };  // MPMBase class
 }  // namespace mpm
 

@@ -477,38 +477,52 @@ bool mpm::MPMBase<Tdim>::apply_nodal_tractions() {
   return status;
 }
 
-//! Apply properties to particles sets (e.g: material, remove step)
+//! Apply properties to particles sets
+//!(e.g: initialise material, remove step, change material step)
 template <unsigned Tdim>
 bool mpm::MPMBase<Tdim>::apply_properties_to_particles_sets() {
   unsigned phase = 0;
-  bool status = false;
-  try {
-    // Get particle properties
-    auto particle_props = io_->json_object("particle");
-    // Get particle sets properties
-    auto particle_sets = particle_props["particle_sets"];
-    // Iterate over each particle sets
-    for (const auto& psets : particle_sets) {
-      // Assign material to particle sets
-      // Get set material from list of materials
-      auto set_material = materials_.at(psets["material_id"]);
-      // Assign material to particles in the specific sets
-      mesh_->iterate_over_particle_set(
-          psets["set_id"],
-          std::bind(&mpm::ParticleBase<Tdim>::assign_material,
-                    std::placeholders::_1, phase, set_material));
-
-      // Assign remove steps to particle sets
-      // Check if remove step is needed
-      if (psets["remove"] == true) {
-        // Add remove step to the map
-        mesh_->create_remove_step(psets["rstep"], psets["set_id"]);
+  bool status = true;
+  // Get particle properties
+  auto particle_props = io_->json_object("particle");
+  // Get particle sets properties
+  auto particle_sets = particle_props["particle_sets"];
+  // Iterate over each particle sets
+  for (const auto& psets : particle_sets) {
+    // Assign material to particle sets
+    try {
+      if (psets["initialise_material"]) {
+        auto set_material = materials_.at(psets["material_id"]);
+        // Assign material to particles in the specific sets
+        mesh_->iterate_over_particle_set(
+            psets["set_id"],
+            std::bind(&mpm::ParticleBase<Tdim>::assign_material,
+                      std::placeholders::_1, phase, set_material));
       }
+    } catch (std::exception& exception) {
+      status = false;
+      console_->error("#{}: Particle sets initialise material: {}", __LINE__,
+                      exception.what());
     }
-    status = true;
-  } catch (std::exception& exception) {
-    console_->error("#{}: Particle sets material: {}", __LINE__,
-                    exception.what());
+    // Add change material steps to the map
+    try {
+      if (psets["change_material"])
+        this->create_change_material_step(psets["cmstep"], psets["set_id"],
+                                          psets["new_material_id"]);
+    } catch (std::exception& exception) {
+      status = false;
+      console_->error("#{}: Particle sets change material: {}", __LINE__,
+                      exception.what());
+    }
+    // Add remove step to the map
+    try {
+      if (psets["remove"])
+        mesh_->create_remove_step(psets["rstep"], psets["set_id"]);
+    } catch (std::exception& exception) {
+      status = false;
+      console_->error("#{}: Particle sets remove particles: {}", __LINE__,
+                      exception.what());
+    }
   }
   return status;
 }
@@ -637,4 +651,67 @@ bool mpm::MPMBase<Tdim>::is_isoparametric() {
     isoparametric = true;
   }
   return isoparametric;
+}
+
+//! Create map of container of change material steps
+template <unsigned Tdim>
+void mpm::MPMBase<Tdim>::create_change_material_step(
+    const mpm::Index cmstep, const unsigned set_id,
+    const unsigned material_id) {
+  //! Initialse the set of particle sets ids
+  std::vector<unsigned> sids;
+  //! Initialse the change material step for the specific material existing at
+  //! "cmstep"
+  tsl::robin_map<mpm::Index, std::vector<unsigned>> change_material;
+  // Get the current change material step existing at "cmstep"
+  if (change_material_steps_.find(cmstep) != change_material_steps_.end()) {
+    // Get the map at "cmstep"
+    change_material = change_material_steps_.at(cmstep);
+    // Get the change material step for the specific material existing at
+    // "cmstep"
+    if (change_material.find(material_id) != change_material.end()) {
+      // Get the set of particle sets ids
+      sids = change_material.at(material_id);
+      // Delete the current change material step for the specific material
+      // existing at "cmstep"
+      change_material.erase(material_id);
+    }
+    // Delete the current change material step existing at "cmstep"
+    change_material_steps_.erase(cmstep);
+  }
+  // Add set id of particle set into the vector
+  sids.insert(sids.end(), set_id);
+  // Add the change material step for the specific material existing at "cmstep"
+  change_material.insert(
+      std::pair<mpm::Index, std::vector<unsigned>>(material_id, sids));
+  // Add the change material step existing at "cmstep"
+  change_material_steps_.insert(
+      std::pair<mpm::Index, tsl::robin_map<mpm::Index, std::vector<unsigned>>>(
+          cmstep, change_material));
+}
+
+//! Create map of container of change material steps
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::apply_change_material_step(const mpm::Index cmstep) {
+  bool status = true;
+  const unsigned phase = 0;
+  try {
+    // Apply change material step
+    if (change_material_steps_.find(cmstep) != change_material_steps_.end()) {
+      for (auto change_material : change_material_steps_.at(cmstep)) {
+        // Get material
+        auto material = materials_.at(change_material.first);
+        // Get ids of particle sets
+        std::vector<unsigned> sids = change_material.second;
+        for (auto& sid : sids)
+          mesh_->iterate_over_particle_set(
+              sid, std::bind(&mpm::ParticleBase<Tdim>::assign_material,
+                             std::placeholders::_1, phase, material));
+      }
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
 }
