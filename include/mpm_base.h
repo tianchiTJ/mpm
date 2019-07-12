@@ -72,6 +72,10 @@ class MPMBase : public MPM {
   //! \param[in] cmstep Step number of the change material
   bool apply_change_material_step(const mpm::Index cmstep);
 
+  //! Resume change material particles
+  //! \param[in] resume_step Resume step
+  bool resume_change_material(const mpm::Index resume_step);
+
  private:
   //! Return if a mesh will be isoparametric or not
   //! \retval isoparametric Status of mesh type

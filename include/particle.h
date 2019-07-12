@@ -58,6 +58,9 @@ class Particle : public ParticleBase<Tdim> {
   //! Initialise properties
   void initialise() override;
 
+  //! Initialise properties for changing material
+  void initialise_change_material() override;
+
   //! Compute reference coordinates in a cell
   bool compute_reference_location() override;
 

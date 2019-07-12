@@ -105,6 +105,22 @@ void mpm::Particle<Tdim, Tnphases>::initialise() {
   coordinates_reference_ = coordinates_;
 }
 
+// Initialise particle properties for changing material
+template <unsigned Tdim, unsigned Tnphases>
+void mpm::Particle<Tdim, Tnphases>::initialise_change_material() {
+  dstrain_.setZero();
+  mass_.setZero();
+  pressure_.setZero();
+  strain_rate_.setZero();
+  strain_.setZero();
+  plastic_strain_.setZero();
+  stress_.setZero();
+  traction_.setZero();
+  velocity_.setZero();
+  volumetric_strain_centroid_.setZero();
+  coordinates_ = coordinates_reference_;
+}
+
 // Assign a cell to particle
 template <unsigned Tdim, unsigned Tnphases>
 bool mpm::Particle<Tdim, Tnphases>::assign_cell(

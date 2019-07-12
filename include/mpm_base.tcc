@@ -551,8 +551,11 @@ bool mpm::MPMBase<Tdim>::checkpoint_resume() {
         io_->output_file(attribute, extension, uuid_, step_, this->nsteps_)
             .string();
 
-    // Initialise remove particles
-    mesh_->resume_remove_particles(step_);
+    // Resume changing material step
+    bool resume_cmstep = resume_change_material(step_);
+
+    // Resume remove particles step
+    bool resume_rstep = mesh_->resume_remove_particles(step_);
 
     // Load particle information from file
     mesh_->read_particles_hdf5(phase, particles_file);
@@ -703,15 +706,40 @@ bool mpm::MPMBase<Tdim>::apply_change_material_step(const mpm::Index cmstep) {
         auto material = materials_.at(change_material.first);
         // Get ids of particle sets
         std::vector<unsigned> sids = change_material.second;
-        for (auto& sid : sids)
+        for (auto& sid : sids) {
+          // Assign new material
           mesh_->iterate_over_particle_set(
               sid, std::bind(&mpm::ParticleBase<Tdim>::assign_material,
                              std::placeholders::_1, phase, material));
+          // Initialse properties
+          mesh_->iterate_over_particle_set(
+              sid,
+              std::bind(&mpm::ParticleBase<Tdim>::initialise_change_material,
+                        std::placeholders::_1));
+          // Compute mass
+          mesh_->iterate_over_particle_set(
+              sid, std::bind(&mpm::ParticleBase<Tdim>::compute_mass,
+                             std::placeholders::_1, phase));
+        }
       }
     }
   } catch (std::exception& exception) {
     console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
     status = false;
+  }
+  return status;
+}
+
+//! Resume change material particles
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::resume_change_material(const mpm::Index resume_step) {
+  bool status = false;
+  // Iterate over each remove steps
+  for (auto cmstep : change_material_steps_) {
+    // Check remove steps before resume step
+    if (cmstep.first <= resume_step) {
+      status = this->apply_change_material_step(cmstep.first);
+    }
   }
   return status;
 }

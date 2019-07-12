@@ -136,6 +136,9 @@ class ParticleBase {
   //! Initialise properties
   virtual void initialise() = 0;
 
+  //! Initialise properties for changing material
+  virtual void initialise_change_material() = 0;
+
   //! Assign mass
   virtual void assign_mass(unsigned phase, double mass) = 0;
 
