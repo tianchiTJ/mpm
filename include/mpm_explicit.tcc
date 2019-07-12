@@ -93,7 +93,8 @@ bool mpm::MPMExplicit<Tdim>::solve() {
     // Spawn a task for initialising nodes and cells
     task_group.run([&] {
       // Apply change material step
-      bool change_material_status = this->apply_change_material_step(step_);
+      bool change_material_status =
+          this->apply_change_material_step(step_, false);
 
       // Apply remove step
       bool remove_status = mesh_->apply_remove_step(step_);

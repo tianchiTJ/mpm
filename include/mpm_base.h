@@ -70,7 +70,8 @@ class MPMBase : public MPM {
 
   //! Apply change material steps
   //! \param[in] cmstep Step number of the change material
-  bool apply_change_material_step(const mpm::Index cmstep);
+  //! \param[in] resume Status of resume
+  bool apply_change_material_step(const mpm::Index cmstep, const bool resume);
 
   //! Resume change material particles
   //! \param[in] resume_step Resume step

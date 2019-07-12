@@ -695,7 +695,8 @@ void mpm::MPMBase<Tdim>::create_change_material_step(
 
 //! Create map of container of change material steps
 template <unsigned Tdim>
-bool mpm::MPMBase<Tdim>::apply_change_material_step(const mpm::Index cmstep) {
+bool mpm::MPMBase<Tdim>::apply_change_material_step(const mpm::Index cmstep,
+                                                    const bool resume) {
   bool status = true;
   const unsigned phase = 0;
   try {
@@ -711,15 +712,17 @@ bool mpm::MPMBase<Tdim>::apply_change_material_step(const mpm::Index cmstep) {
           mesh_->iterate_over_particle_set(
               sid, std::bind(&mpm::ParticleBase<Tdim>::assign_material,
                              std::placeholders::_1, phase, material));
-          // Initialse properties
-          mesh_->iterate_over_particle_set(
-              sid,
-              std::bind(&mpm::ParticleBase<Tdim>::initialise_change_material,
-                        std::placeholders::_1));
-          // Compute mass
-          mesh_->iterate_over_particle_set(
-              sid, std::bind(&mpm::ParticleBase<Tdim>::compute_mass,
-                             std::placeholders::_1, phase));
+          if (!resume) {
+            // Initialse properties
+            mesh_->iterate_over_particle_set(
+                sid,
+                std::bind(&mpm::ParticleBase<Tdim>::initialise_change_material,
+                          std::placeholders::_1));
+            // Compute mass
+            mesh_->iterate_over_particle_set(
+                sid, std::bind(&mpm::ParticleBase<Tdim>::compute_mass,
+                               std::placeholders::_1, phase));
+          }
         }
       }
     }
@@ -738,7 +741,7 @@ bool mpm::MPMBase<Tdim>::resume_change_material(const mpm::Index resume_step) {
   for (auto cmstep : change_material_steps_) {
     // Check remove steps before resume step
     if (cmstep.first <= resume_step) {
-      status = this->apply_change_material_step(cmstep.first);
+      status = this->apply_change_material_step(cmstep.first, true);
     }
   }
   return status;
