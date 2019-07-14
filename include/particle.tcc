@@ -412,6 +412,69 @@ bool mpm::Particle<Tdim, Tnphases>::map_mass_momentum_to_nodes(unsigned phase) {
   return status;
 }
 
+//! Map mass and momentum of a particle in a subdomain to nodes
+template <unsigned Tdim, unsigned Tnphases>
+bool mpm::Particle<Tdim, Tnphases>::map_mass_momentum_to_nodes_subdomain(
+    unsigned phase) {
+  bool status = true;
+  try {
+    // Check if particle mass in subdomain is set
+    if (mass_(phase) != std::numeric_limits<double>::max()) {
+      // Map particle mass and momentum to nodes
+      this->cell_->map_mass_momentum_to_nodes_subdomain(
+          this->shapefn_, phase, mass_(phase), velocity_.col(phase),
+          this->material_.at(phase)->id());
+    } else {
+      throw std::runtime_error("Particle subdomain mass has not been computed");
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Map particle coordinates to nodes
+template <unsigned Tdim, unsigned Tnphases>
+bool mpm::Particle<Tdim, Tnphases>::map_coordinates_to_nodes(unsigned phase) {
+  bool status = true;
+  try {
+    // Check if particle mass is set
+    if (mass_(phase) != std::numeric_limits<double>::max()) {
+      // Map particle coordinates to nodes
+      this->cell_->map_coordinates_to_nodes(this->shapefn_, mass_(phase),
+                                            this->coordinates_);
+    } else {
+      throw std::runtime_error("Particle mass has not been computed");
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Map coordinates of a particle in a subdomain to nodes
+template <unsigned Tdim, unsigned Tnphases>
+bool mpm::Particle<Tdim, Tnphases>::map_coordinates_to_nodes_subdomain(
+    unsigned phase) {
+  bool status = true;
+  try {
+    // Check if particle mass is set
+    if (mass_(phase) != std::numeric_limits<double>::max()) {
+      this->cell_->map_coordinates_to_nodes_subdomain(
+          this->shapefn_, mass_(phase), this->coordinates_,
+          this->material_.at(phase)->id());
+    } else {
+      throw std::runtime_error("Particle mass has not been computed");
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
 // Compute strain of the particle
 template <unsigned Tdim, unsigned Tnphases>
 void mpm::Particle<Tdim, Tnphases>::compute_strain(unsigned phase, double dt) {
@@ -454,6 +517,65 @@ void mpm::Particle<Tdim, Tnphases>::compute_strain(unsigned phase, double dt) {
   // Strain rate for reduced integration
   Eigen::VectorXd strain_rate_centroid =
       cell_->compute_strain_rate_centroid(phase);
+
+  // Check to see if value is below threshold
+  for (unsigned i = 0; i < strain_rate_centroid.size(); ++i)
+    if (std::fabs(strain_rate_centroid(i)) < 1.E-15)
+      strain_rate_centroid(i) = 0.;
+
+  // Assign volumetric strain at centroid
+  const double dvolumetric_strain = dt * strain_rate_centroid.head(Tdim).sum();
+  volumetric_strain_centroid_(phase) += dvolumetric_strain;
+
+  // Update thermodynamic pressure
+  this->update_pressure(phase, dvolumetric_strain);
+}
+
+//! Compute strain of a subdomain
+template <unsigned Tdim, unsigned Tnphases>
+void mpm::Particle<Tdim, Tnphases>::compute_strain_subdomain(unsigned phase,
+                                                             double dt) {
+  // Strain rate
+  const auto strain_rate = cell_->compute_strain_rate_subdomain(
+      bmatrix_, phase, this->material_.at(phase)->id());
+  // particle_strain_rate
+  Eigen::Matrix<double, 6, 1> particle_strain_rate;
+  particle_strain_rate.setZero();
+  // Set dimension of strain rate
+  switch (Tdim) {
+    case (1): {
+      particle_strain_rate(0) = strain_rate(0);
+      break;
+    }
+    case (2): {
+      particle_strain_rate(0) = strain_rate(0);
+      particle_strain_rate(1) = strain_rate(1);
+      particle_strain_rate(3) = strain_rate(2);
+      break;
+    }
+    default: {
+      particle_strain_rate = strain_rate;
+      break;
+    }
+  }
+
+  // Check to see if value is below threshold
+  for (unsigned i = 0; i < particle_strain_rate.size(); ++i)
+    if (std::fabs(particle_strain_rate(i)) < 1.E-15)
+      particle_strain_rate(i) = 0.;
+
+  // Assign strain rate
+  strain_rate_.col(phase) = particle_strain_rate;
+  // Update dstrain
+  dstrain_.col(phase) = particle_strain_rate * dt;
+  // Update strain
+  strain_.col(phase) += particle_strain_rate * dt;
+
+  // Compute at centroid
+  // Strain rate for reduced integration
+  Eigen::VectorXd strain_rate_centroid =
+      cell_->compute_strain_rate_centroid_subdomain(
+          phase, this->material_.at(phase)->id());
 
   // Check to see if value is below threshold
   for (unsigned i = 0; i < strain_rate_centroid.size(); ++i)
@@ -551,6 +673,18 @@ void mpm::Particle<Tdim, Tnphases>::map_body_force(unsigned phase,
                                   pgravity);
 }
 
+//! Map body force of a subdomain
+//! \param[in] phase Index corresponding to the phase
+//! \param[in] pgravity Gravity of a particle
+template <unsigned Tdim, unsigned Tnphases>
+void mpm::Particle<Tdim, Tnphases>::map_body_force_subdomain(
+    unsigned phase, const VectorDim& pgravity) {
+  // Compute nodal body forces
+  cell_->compute_nodal_body_force_subdomain(this->shapefn_, phase,
+                                            this->mass_(phase), pgravity,
+                                            this->material_.at(phase)->id());
+}
+
 //! Map internal force
 //! \param[in] phase Index corresponding to the phase
 template <unsigned Tdim, unsigned Tnphases>
@@ -564,6 +698,30 @@ bool mpm::Particle<Tdim, Tnphases>::map_internal_force(unsigned phase) {
       cell_->compute_nodal_internal_force(this->bmatrix_, phase,
                                           this->volume_(phase),
                                           -1. * this->stress_.col(phase));
+    } else {
+      throw std::runtime_error("Material is invalid");
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Map internal force of a subdomain
+//! \param[in] phase Index corresponding to the phase
+template <unsigned Tdim, unsigned Tnphases>
+bool mpm::Particle<Tdim, Tnphases>::map_internal_force_subdomain(
+    unsigned phase) {
+  bool status = true;
+  try {
+    // Check if  material ptr is valid
+    if (material_.at(phase) != nullptr) {
+      // Compute nodal internal forces
+      // -pstress * volume
+      cell_->compute_nodal_internal_force_subdomain(
+          this->bmatrix_, phase, this->volume_(phase),
+          -1. * this->stress_.col(phase), this->material_.at(phase)->id());
     } else {
       throw std::runtime_error("Material is invalid");
     }
@@ -627,6 +785,18 @@ void mpm::Particle<Tdim, Tnphases>::map_traction_force(unsigned phase) {
                                         this->traction_.col(phase));
 }
 
+//! Map traction force of a subdomain
+//! \param[in] phase Index corresponding to the phase
+template <unsigned Tdim, unsigned Tnphases>
+void mpm::Particle<Tdim, Tnphases>::map_traction_force_subdomain(
+    unsigned phase) {
+  if (this->set_traction_)
+    // Map particle traction forces to nodes
+    cell_->compute_nodal_traction_force_subdomain(
+        this->shapefn_, phase, this->traction_.col(phase),
+        this->material_.at(phase)->id());
+}
+
 // Compute updated position of the particle
 template <unsigned Tdim, unsigned Tnphases>
 bool mpm::Particle<Tdim, Tnphases>::compute_updated_position(unsigned phase,
@@ -663,6 +833,44 @@ bool mpm::Particle<Tdim, Tnphases>::compute_updated_position(unsigned phase,
   return status;
 }
 
+//! Compute updated position of the particle of a subdomain
+template <unsigned Tdim, unsigned Tnphases>
+bool mpm::Particle<Tdim, Tnphases>::compute_updated_position_subdomain(
+    unsigned phase, double dt) {
+  bool status = true;
+  try {
+    // Check if particle has a valid cell ptr
+    if (cell_ != nullptr) {
+      // Get interpolated nodal acceleration
+      const Eigen::Matrix<double, Tdim, 1> nodal_acceleration =
+          cell_->interpolate_nodal_acceleration_subdomain(
+              this->shapefn_, phase, this->material_.at(phase)->id());
+
+      // Update particle velocity from interpolated nodal acceleration
+      this->velocity_.col(phase) += nodal_acceleration * dt;
+
+      // Apply particle velocity constraints
+      this->apply_particle_velocity_constraints();
+
+      // Get interpolated nodal velocity
+      const Eigen::Matrix<double, Tdim, 1> nodal_velocity =
+          cell_->interpolate_nodal_velocity_subdomain(
+              this->shapefn_, phase, this->material_.at(phase)->id());
+
+      // New position  current position + velocity * dt
+      this->coordinates_ += nodal_velocity * dt;
+    } else {
+      throw std::runtime_error(
+          "Cell is not initialised! "
+          "cannot compute updated coordinates of the particle");
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
 // Compute updated position of the particle based on nodal velocity
 template <unsigned Tdim, unsigned Tnphases>
 bool mpm::Particle<Tdim, Tnphases>::compute_updated_position_velocity(
@@ -674,6 +882,40 @@ bool mpm::Particle<Tdim, Tnphases>::compute_updated_position_velocity(
       // Get interpolated nodal velocity
       const Eigen::Matrix<double, Tdim, 1> nodal_velocity =
           cell_->interpolate_nodal_velocity(this->shapefn_, phase);
+
+      // Update particle velocity to interpolated nodal velocity
+      this->velocity_.col(phase) = nodal_velocity;
+
+      // Apply particle velocity constraints
+      this->apply_particle_velocity_constraints();
+
+      // New position current position + velocity * dt
+      this->coordinates_ += nodal_velocity * dt;
+    } else {
+      throw std::runtime_error(
+          "Cell is not initialised! "
+          "cannot compute updated coordinates of the particle");
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Compute updated position of the particle of a subdomain based on nodal
+//! velocity
+template <unsigned Tdim, unsigned Tnphases>
+bool mpm::Particle<Tdim, Tnphases>::compute_updated_position_velocity_subdomain(
+    unsigned phase, double dt) {
+  bool status = true;
+  try {
+    // Check if particle has a valid cell ptr
+    if (cell_ != nullptr) {
+      // Get interpolated nodal velocity
+      const Eigen::Matrix<double, Tdim, 1> nodal_velocity =
+          cell_->interpolate_nodal_velocity_subdomain(
+              this->shapefn_, phase, this->material_.at(phase)->id());
 
       // Update particle velocity to interpolated nodal velocity
       this->velocity_.col(phase) = nodal_velocity;

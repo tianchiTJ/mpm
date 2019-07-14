@@ -44,6 +44,9 @@ class Node : public NodeBase<Tdim> {
   //! Initialise nodal properties
   void initialise() override;
 
+  //! Initialise nodal properties of a subdomain
+  void initialise_subdomain(unsigned mid) override;
+
   //! Return id of the nodebase
   Index id() const override { return id_; }
 
@@ -72,6 +75,14 @@ class Node : public NodeBase<Tdim> {
   //! \param[in] mass Mass from the particles in a cell
   void update_mass(bool update, unsigned phase, double mass) override;
 
+  //! Update mass of a subdomain at the nodes from particle
+  //! \param[in] update A boolean to update (true) or assign (false)
+  //! \param[in] phase Index corresponding to the phase
+  //! \param[in] mass Mass from the particles in a cell
+  //! \param[in] mid Subdomain id (material id)
+  void update_mass_subdomain(bool update, unsigned phase, double mass,
+                             unsigned mid) override;
+
   //! Return mass at a given node for a given phase
   //! \param[in] phase Index corresponding to the phase
   double mass(unsigned phase) const override { return mass_(phase); }
@@ -94,6 +105,15 @@ class Node : public NodeBase<Tdim> {
   bool assign_traction_force(unsigned phase, unsigned direction,
                              double traction) override;
 
+  //! Assign traction force of a subdomain to the node
+  //! \param[in] phase Index corresponding to the phase
+  //! \param[in] direction Index corresponding to the direction of traction
+  //! \param[in] traction Nodal traction in specified direction
+  //! \param[in] mid Subdomain id (material id)
+  //! \retval status Assignment status
+  bool assign_traction_force_subdomain(unsigned phase, unsigned direction,
+                                       double traction, unsigned mid) override;
+
   //! Update external force (body force / traction force)
   //! \param[in] update A boolean to update (true) or assign (false)
   //! \param[in] phase Index corresponding to the phase
@@ -101,6 +121,16 @@ class Node : public NodeBase<Tdim> {
   //! \retval status Update status
   bool update_external_force(bool update, unsigned phase,
                              const VectorDim& force) override;
+
+  //! Update external force of a subdomain (body force / traction force)
+  //! \param[in] update A boolean to update (true) or assign (false)
+  //! \param[in] phase Index corresponding to the phase
+  //! \param[in] force External force from the particles in a cell
+  //! \param[in] mid Subdomain id (material id)
+  //! \retval status Update status
+  bool update_external_force_subdomain(bool update, unsigned phase,
+                                       const VectorDim& force,
+                                       unsigned mid) override;
 
   //! Return external force at a given node for a given phase
   //! \param[in] phase Index corresponding to the phase
@@ -115,6 +145,16 @@ class Node : public NodeBase<Tdim> {
   //! \retval status Update status
   bool update_internal_force(bool update, unsigned phase,
                              const VectorDim& force) override;
+
+  //! Update internal force of a subdomain (body force / traction force)
+  //! \param[in] update A boolean to update (true) or assign (false)
+  //! \param[in] phase Index corresponding to the phase
+  //! \param[in] force Internal force from the particles in a cell
+  //! \param[in] mid Subdomain id (material id)
+  //! \retval status Update status
+  bool update_internal_force_subdomain(bool update, unsigned phase,
+                                       const VectorDim& force,
+                                       unsigned mid) override;
 
   //! Return internal force at a given node for a given phase
   //! \param[in] phase Index corresponding to the phase
@@ -145,6 +185,32 @@ class Node : public NodeBase<Tdim> {
   bool update_momentum(bool update, unsigned phase,
                        const VectorDim& momentum) override;
 
+  //! Update momentum of a subdomain at the nodes
+  //! \param[in] update A boolean to update (true) or assign (false)
+  //! \param[in] phase Index corresponding to the phase
+  //! \param[in] momentum Momentum from the particles in a cell
+  //! \param[in] mid subdomain id (material id)
+  //! \retval status Update status
+  bool update_momentum_subdomain(bool update, unsigned phase,
+                                 const VectorDim& momentum,
+                                 unsigned mid) override;
+
+  //! Update coordinates at the nodes
+  //! \param[in] update A boolean to update (true) or assign (false)
+  //! \param[in] shapefn_coordinates Shapefn * coordinates from the particles in
+  //! a cell \retval status Update status
+  bool update_coordinates(bool update, double pmass,
+                          const VectorDim& shapefn_coordinates) override;
+
+  //! Update coordinates of a subdomain at the nodes
+  //! \param[in] update A boolean to update (true) or assign (false)
+  //! \param[in] shapefn_coordinates Shapefn * coordinates from the particles in
+  //! a cell \param[in] mid subdomain id (material id) \retval status Update
+  //! status
+  bool update_coordinates_subdomain(bool update, double pmass,
+                                    const VectorDim& shapefn_coordinates,
+                                    unsigned mid) override;
+
   //! Return momentum at a given node for a given phase
   //! \param[in] phase Index corresponding to the phase
   VectorDim momentum(unsigned phase) const override {
@@ -154,10 +220,20 @@ class Node : public NodeBase<Tdim> {
   //! Compute velocity from the momentum
   void compute_velocity() override;
 
+  //! Compute velocity of a subdomain from the momentum
+  void compute_velocity_subdomain(unsigned mid) override;
+
   //! Return velocity at a given node for a given phase
   //! \param[in] phase Index corresponding to the phase
   VectorDim velocity(unsigned phase) const override {
     return velocity_.col(phase);
+  }
+
+  //! Return velocity of a subdomain at a given node for a given phase
+  //! \param[in] phase Index corresponding to the phase
+  //! \param[in] mid Subdomain id (material id)
+  VectorDim velocity_subdomain(unsigned phase, unsigned mid) const override {
+    return velocity_subdomain_.at(mid).col(phase);
   }
 
   //! Update nodal acceleration
@@ -174,10 +250,25 @@ class Node : public NodeBase<Tdim> {
     return acceleration_.col(phase);
   }
 
+  //! Return acceleration of a subdomain at a given node for a given phase
+  //! \param[in] phase Index corresponding to the phase
+  //! \param[in] mid Subdomain id (material id)
+  VectorDim acceleration_subdomain(unsigned phase,
+                                   unsigned mid) const override {
+    return acceleration_subdomain_.at(mid).col(phase);
+  }
+
   //! Compute acceleration and velocity
   //! \param[in] phase Index corresponding to the phase
   //! \param[in] dt Timestep in analysis
   bool compute_acceleration_velocity(unsigned phase, double dt) override;
+
+  //! Compute acceleration and velocity of a subdomain
+  //! \param[in] phase Index corresponding to the phase
+  //! \param[in] dt Timestep in analysis
+  //! \param[in] mid Subdomain id (material id)
+  bool compute_acceleration_velocity_subdomain(unsigned phase, double dt,
+                                               unsigned mid) override;
 
   //! Assign velocity constraint
   //! Directions can take values between 0 and Dim * Nphases
@@ -187,6 +278,9 @@ class Node : public NodeBase<Tdim> {
 
   //! Apply velocity constraints
   void apply_velocity_constraints() override;
+
+  //! Apply velocity constraints of a subdomain
+  void apply_velocity_constraints_subdomain(unsigned mid) override;
 
   //! Assign friction constraint
   //! Directions can take values between 0 and Dim * Nphases
@@ -200,6 +294,11 @@ class Node : public NodeBase<Tdim> {
   //! \param[in] dt Time-step
   void apply_friction_constraints(double dt) override;
 
+  //! Apply friction constraints of a subdomain
+  //! \param[in] dt Time-step
+  //! \param[in] mid Subdomain id (material id)
+  void apply_friction_constraints_subdomain(double dt, unsigned mid) override;
+
   //! Assign rotation matrix
   //! \param[in] rotation_matrix Rotation matrix of the node
   void assign_rotation_matrix(
@@ -207,6 +306,55 @@ class Node : public NodeBase<Tdim> {
     rotation_matrix_ = rotation_matrix;
     generic_boundary_constraints_ = true;
   }
+
+  //! Compute normal vector of contact interface of a subdomain
+  //! \param[in] normal_vector_type Computation method
+  //! \param[in] normal_vector Default normal vector
+  //! \param[in] mid Subdomain id (material id)
+  void compute_normal_vector(const std::string normal_vector_type,
+                             const VectorDim normal_vector,
+                             unsigned mid) override;
+
+  //! Compute tangent vector of contact interface of a subdomain
+  //! \param[in] momentum_difference Momentum difference
+  //! \param[in] mid Subdomain id (material id)
+  void compute_tangent_vector(
+      const Eigen::Matrix<double, Tdim, 1> momentum_difference,
+      unsigned mid) override;
+
+  //! Compute correction momentum
+  //! \param[in] friction_type Iterface friction type (rough or frictional)
+  //! \param[in] friction_coefficient Friction coefficient
+  //! \param[in] momentum_difference Momentum difference
+  //! \param[in] separation_normal Normal separation
+  //! \param[in] mid Subdomain id (material id)
+  void compute_correction_momentum(
+      const std::string friction_type, const double friction_coefficient,
+      const Eigen::Matrix<double, Tdim, 1> momentum_difference,
+      const double separation_normal, unsigned mid) override;
+
+  //! Compute contact force
+  //! \param[in] separation_normal Normal separation
+  //! \param[in] separation_cut_off Cut off value of separation check
+  //! \param[in] dc_n Normal contact stiffness
+  //! \param[in] friction_coefficient Friction coefficient
+  //! \param[in] mid Subdomain id (material id)
+  void compute_contact_force(const double separation_normal,
+                             const double separation_cut_off, const double dc_n,
+                             const double friction_coefficient,
+                             unsigned mid) override;
+
+  //! Compute contact interface on node
+  //! \param[in] friction_type Iterface friction type (rough or frictional)
+  //! \param[in] friction_coefficient Friction coefficient
+  //! \param[in] separation_cut_off Cut off value of separation check
+  //! \param[in] dc_n Normal contact stiffness
+  //! \param[in] mid Material id of subdomain
+  void compute_contact_interface(bool contact_force,
+                                 const std::string friction_type,
+                                 const double friction_coefficient,
+                                 const double separation_cut_off,
+                                 const double dc_n, unsigned mid) override;
 
  private:
   //! Mutex
@@ -247,6 +395,31 @@ class Node : public NodeBase<Tdim> {
   std::tuple<unsigned, int, double> friction_constraint_;
   //! Logger
   std::unique_ptr<spdlog::logger> console_;
+
+  //! Contact algorithm
+  //! Nodal coordinates mapped from particles
+  VectorDim coordinates_from_particles_;
+  //! Normal vector of contact interface for each subdomain
+  std::map<unsigned, VectorDim> normal_vector_;
+  //! Tangent vector of contact interface for each subdomain
+  std::map<unsigned, VectorDim> tangent_vector_;
+  //! Mass for each subdomain
+  std::map<unsigned, Eigen::Matrix<double, 1, Tnphases>> mass_subdomain_;
+  //! Nodal coordinates mapped from particles for each subdomain
+  std::map<unsigned, VectorDim> coordinates_from_particles_subdomain_;
+  //! External force for each subdomain
+  std::map<unsigned, Eigen::Matrix<double, Tdim, Tnphases>>
+      external_force_subdomain_;
+  //! Internal force for each subdomain
+  std::map<unsigned, Eigen::Matrix<double, Tdim, Tnphases>>
+      internal_force_subdomain_;
+  //! Velocity for each subdomain
+  std::map<unsigned, Eigen::Matrix<double, Tdim, Tnphases>> velocity_subdomain_;
+  //! Momentum for each subdomain
+  std::map<unsigned, Eigen::Matrix<double, Tdim, Tnphases>> momentum_subdomain_;
+  //! Acceleration for each subdomain
+  std::map<unsigned, Eigen::Matrix<double, Tdim, Tnphases>>
+      acceleration_subdomain_;
 };  // Node class
 }  // namespace mpm
 
