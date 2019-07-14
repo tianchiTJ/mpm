@@ -153,109 +153,108 @@ mpirun -N 4 ./mpm -f ~/benchmarks/3d/uniaxial-stress -i mpm.json
 {
     "title" : "model_name",
     "input_files" : {
-	      "mesh" : "mesh.txt",
-	      "particles" : "particles.txt",
-        "velocity_constraints" : "velocity-constraints.txt",
-        "particles_volumes" : "particles-volumes.txt",
-        "particles_stresses" : "particles-stresses.txt",
-        "entity_sets": "entity-sets.json"
-    },
+      "mesh" : "mesh.txt",
+      "particles" : "particles.txt",
+      "velocity_constraints" : "velocity-constraints.txt",
+      "particles_volumes" : "particles-volumes.txt",
+      "particles_stresses" : "particles-stresses.txt",
+      "entity_sets": "entity-sets.json"
+      },
     "mesh" : {
-	      "isoparametric": false,
-	      "cell_type": "ED2Q4",
-	      "mesh_reader": "Ascii2D",
-	      "node_type": "N2D"
-    },
+      "isoparametric": false,
+      "cell_type": "ED2Q4",
+      "mesh_reader": "Ascii2D",
+      "node_type": "N2D"
+      },
     "particle": {
-        "material_id": 0,
-        "particle_type": "P2D",
-        "stress_check":[0],
-        "critical_stress":1E-7,
-        "particle_sets": [
-        {
-          "set_id": 0,
-          "initialise_material": true,
-          "material_id": 1,
-          "change_material": false,
-          "remove": false
-        },
-        {
-          "set_id": 1,
-          "initialise_material": false,
-          "change_material": true,
-          "new_material_id": 1,
-          "cmstep": 1000,
-          "remove": false
-        },
-        {
-          "set_id": 2,
-          "initialise_material": false,
-          "change_material": false,
-          "remove": true,
-          "rstep":1000
-        }
-        ]
-    },
+      "material_id": 0,
+      "particle_type": "P2D",
+      "particle_sets": [
+      {
+        "set_id": 0,
+        "initialise_material": true,
+        "material_id": 1,
+        "change_material": false,
+        "remove": false
+      },
+      {
+        "set_id": 1,
+        "initialise_material": false,
+        "change_material": true,
+        "new_material_id": 1,
+        "cmstep": 1000,
+        "remove": false
+      },
+      {
+        "set_id": 2,
+        "initialise_material": false,
+        "change_material": false,
+        "remove": true,
+        "rstep":1000
+      }
+      ]
+      },
     "materials" : [
-	{
-	    "id" : 0,
-	    "type" : "MohrCoulomb2D",
-	    "density" : 1800,
-	    "youngs_modulus" : 20000000.0,
-	    "poisson_ratio" : 0.3,
-	    "friction" : 0.00,
-	    "dilation" : 0.00,
-	    "cohesion" : 50000,
-	    "residual_friction" : 0.00,
-	    "residual_dilation" : 0.00,
-	    "residual_cohesion" : 50000,
-	    "peak_epds" : 0.0,
-	    "critical_epds" : 20000.0,
-	    "tension_cutoff" : 0,
-      "softening" : false,
-      "tolerance" : 0.1
-	},
-  {
-	    "id" : 1,
-	    "type" : "MohrCoulomb2D",
-	    "density" : 1800,
-	    "youngs_modulus" : 20000000.0,
-	    "poisson_ratio" : 0.3,
-	    "friction" : 0.00,
-	    "dilation" : 0.00,
-	    "cohesion" : 50000,
-	    "residual_friction" : 0.00,
-	    "residual_dilation" : 0.00,
-	    "residual_cohesion" : 50000,
-	    "peak_epds" : 0.0,
-	    "critical_epds" : 20000.0,
-	    "tension_cutoff" : 0,
-      "softening" : false,
-      "tolerance" : 0.1
-	}
-  ],
+      {
+        "id" : 0,
+        "type" : "MohrCoulomb2D",
+        "density" : 1800.0,
+        "youngs_modulus" : 200000.0,
+        "poisson_ratio" : 0.3
+        "friction" : 0.0,
+        "dilation" : 0.0,
+        "cohesion" : 50000.0,
+        "residual_friction" : 0.0,
+        "residual_dilation" : 0.0,
+        "residual_cohesion" : 50000.0,
+        "peak_epds" : 0.0,
+        "critical_epds" : 20000.0,
+        "tension_cutoff" : 0.1,
+        "softening" : false,
+        "tolerance" : 0.1
+      },
+      {
+        "id" : 1,
+        "type" : "MohrCoulomb2D",
+        "density" : 1800,
+        "youngs_modulus" : 300000.0,
+        "poisson_ratio" : 0.3,
+        "friction" : 0.0,
+        "dilation" : 0.0,
+        "cohesion" : 50000.0,
+        "residual_friction" : 0.0,
+        "residual_dilation" : 0.0,
+        "residual_cohesion" : 50000.0,
+        "peak_epds" : 0.0,
+        "critical_epds" : 20000.0,
+        "tension_cutoff" : 0.1,
+        "softening" : false,
+        "tolerance" : 0.1
+      }
+      ],
     "analysis" : {
-	    "type" : "MPMExplicitUSF2D",
+      "type" : "MPMExplicitUSF2D",
 	    "velocity_update" : false,
+      "strain_energy" : false,
 	    "uuid": "model_name",
 	    "gravity": [ 0.0, -9.81],
 	    "dt" : 0.0001,
 	    "nsteps" : 50000,
 	    "resume" : {
-	        "resume": false,
-	        "uuid": "model_name",
-	        "step" : 40000
-	    }
-    },
+        "resume": false,
+        "uuid": "model_name",
+        "step" : 40000
+      }
+      },
     "post_processing" : {
-    	"path" : "results/",
+      "path" : "results/",
 	    "vtk": [
               "displacements", "velocities",
               "strains", "shear_strains", "plastic_strains", "epds",
               "stresses", "shear_stresses",
               "strain_energy"
              ],
-	    "output_steps" : 1000
+      "output_steps" : 1000
     }
 }
 ```

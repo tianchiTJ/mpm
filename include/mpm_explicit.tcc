@@ -37,6 +37,11 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   if (analysis_.find("resume") != analysis_.end())
     resume = analysis_["resume"]["resume"].template get<bool>();
 
+  // Test if strain energy is needed to compute
+  bool strain_energy = false;
+  if (analysis_.find("strain_energy") != analysis_.end())
+    strain_energy = analysis_["strain_energy"].template get<bool>();
+
   // Pressure smoothing
   if (analysis_.find("pressure_smoothing") != analysis_.end())
     pressure_smoothing_ = analysis_["pressure_smoothing"].template get<bool>();
@@ -188,6 +193,12 @@ bool mpm::MPMExplicit<Tdim>::solve() {
       mesh_->iterate_over_particles(
           std::bind(&mpm::ParticleBase<Tdim>::compute_stress,
                     std::placeholders::_1, phase));
+
+      // Iterate over each particle to compute strain energy
+      if (strain_energy)
+        mesh_->iterate_over_particles(
+            std::bind(&mpm::ParticleBase<Tdim>::compute_strain_energy,
+                      std::placeholders::_1, phase));
     }
 
     // Spawn a task for external force
@@ -294,6 +305,12 @@ bool mpm::MPMExplicit<Tdim>::solve() {
       mesh_->iterate_over_particles(
           std::bind(&mpm::ParticleBase<Tdim>::compute_stress,
                     std::placeholders::_1, phase));
+
+      // Iterate over each particle to compute strain energy
+      if (strain_energy)
+        mesh_->iterate_over_particles(
+            std::bind(&mpm::ParticleBase<Tdim>::compute_strain_energy,
+                      std::placeholders::_1, phase));
     }
 
     // Locate particles

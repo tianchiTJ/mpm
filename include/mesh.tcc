@@ -508,7 +508,15 @@ std::vector<Eigen::Matrix<double, 3, 1>> mpm::Mesh<Tdim>::particles_vector_data(
         auto pdata = (*pitr)->displacements();
         // Fill displacements to the size of dimensions
         for (unsigned i = 0; i < Tdim; ++i) data(i) = pdata(i);
-      } else if (attribute == "epds") {
+      }
+      // Strain energy
+      else if (attribute == "strain_energy") {
+        auto pdata = (*pitr)->strain_energy(phase);
+        // Fill displacements to the size of dimensions
+        for (unsigned i = 0; i < Tdim; ++i) data(i) = pdata;
+      }
+      // Equivalent plastic deviatoric strain
+      else if (attribute == "epds") {
         auto pdata = (*pitr)->state_variable("epds");
         // Fill epds to the size of dimensions
         for (unsigned i = 0; i < Tdim; ++i) data(i) = pdata;

@@ -166,6 +166,12 @@ class Particle : public ParticleBase<Tdim> {
     return plastic_strain_.col(phase);
   }
 
+  //! Return strain energy
+  //! \param[in] phase Index corresponding to the phase
+  double strain_energy(unsigned phase) const override {
+    return strain_energy_(phase);
+  }
+
   //! Return strain rate of the particle
   //! \param[in] phase Index corresponding to the phase
   Eigen::Matrix<double, 6, 1> strain_rate(unsigned phase) const override {
@@ -189,6 +195,9 @@ class Particle : public ParticleBase<Tdim> {
 
   //! Compute stress
   bool compute_stress(unsigned phase) override;
+
+  //! Compute strain energy
+  bool compute_strain_energy(unsigned phase) override;
 
   //! Return stress of the particle
   //! \param[in] phase Index corresponding to the phase
@@ -318,6 +327,8 @@ class Particle : public ParticleBase<Tdim> {
   Eigen::Matrix<double, 6, Tnphases> strain_;
   //! Plastic strains
   Eigen::Matrix<double, 6, Tnphases> plastic_strain_;
+  //! Strain energy
+  Eigen::Matrix<double, 1, Tnphases> strain_energy_;
   //! Volumetric strain at centroid
   Eigen::Matrix<double, Tnphases, 1> volumetric_strain_centroid_;
   //! Strain rate

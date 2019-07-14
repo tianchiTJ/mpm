@@ -97,6 +97,7 @@ void mpm::Particle<Tdim, Tnphases>::initialise() {
   strain_rate_.setZero();
   strain_.setZero();
   plastic_strain_.setZero();
+  strain_energy_.setZero();
   stress_.setZero();
   traction_.setZero();
   velocity_.setZero();
@@ -467,7 +468,7 @@ void mpm::Particle<Tdim, Tnphases>::compute_strain(unsigned phase, double dt) {
   this->update_pressure(phase, dvolumetric_strain);
 }
 
-// Compute stress
+//! Compute stress
 template <unsigned Tdim, unsigned Tnphases>
 bool mpm::Particle<Tdim, Tnphases>::compute_stress(unsigned phase) {
   bool status = true;
@@ -489,6 +490,29 @@ bool mpm::Particle<Tdim, Tnphases>::compute_stress(unsigned phase) {
         plastic_strain(5) = state_variables_.at("plastic_strain5");
         this->plastic_strain_ = plastic_strain;
       }
+    } else {
+      throw std::runtime_error("Material is invalid");
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Compute strain energy
+template <unsigned Tdim, unsigned Tnphases>
+bool mpm::Particle<Tdim, Tnphases>::compute_strain_energy(unsigned phase) {
+  bool status = true;
+  try {
+    // Check if material ptr is valid
+    if (material_.at(phase) != nullptr) {
+      // Incremental of strain
+      Eigen::Matrix<double, 6, 1> dstrain = this->dstrain_.col(phase);
+      // Stress
+      Eigen::Matrix<double, 6, 1> stress = this->stress_.col(phase);
+      // Update strain energy
+      this->strain_energy_(phase) += dstrain.transpose() * stress;
     } else {
       throw std::runtime_error("Material is invalid");
     }

@@ -157,6 +157,9 @@ class ParticleBase {
   //! Plastic strain
   virtual Eigen::Matrix<double, 6, 1> plastic_strain(unsigned phase) const = 0;
 
+  //! Strain energy
+  virtual double strain_energy(unsigned phase) const = 0;
+
   //! Strain rate
   virtual Eigen::Matrix<double, 6, 1> strain_rate(unsigned phase) const = 0;
 
@@ -169,6 +172,9 @@ class ParticleBase {
 
   //! Compute stress
   virtual bool compute_stress(unsigned phase) = 0;
+
+  //! Compute strain energy
+  virtual bool compute_strain_energy(unsigned phase) = 0;
 
   //! Return stress
   virtual Eigen::Matrix<double, 6, 1> stress(unsigned phase) const = 0;
