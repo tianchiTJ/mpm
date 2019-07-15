@@ -110,11 +110,10 @@ bool mpm::MPMExplicitContact<Tdim>::solve() {
       mesh_->iterate_over_nodes(
           std::bind(&mpm::NodeBase<Tdim>::initialise, std::placeholders::_1));
       // Initialise nodes for each subdomain
-      for (const auto& sub : subdomains) {
+      for (const auto& sub : subdomains)
         mesh_->iterate_over_nodes(
             std::bind(&mpm::NodeBase<Tdim>::initialise_subdomain,
                       std::placeholders::_1, sub["material_id"]));
-      }
 
       mesh_->iterate_over_cells(
           std::bind(&mpm::Cell<Tdim>::activate_nodes, std::placeholders::_1));
@@ -170,9 +169,8 @@ bool mpm::MPMExplicitContact<Tdim>::solve() {
       Eigen::Matrix<double, Tdim, 1> normal_vector;
       normal_vector.setZero();
       if (sub["normal_vector_type"] == "SN") {
-        for (unsigned i = 0; i < Tdim; ++i) {
+        for (unsigned i = 0; i < Tdim; ++i)
           normal_vector[i] = sub["normal_vector"].at(i);
-        }
       }
       // Compute normalised normal vector
       mesh_->iterate_over_nodes_predicate(
@@ -306,13 +304,12 @@ bool mpm::MPMExplicitContact<Tdim>::solve() {
 #endif
 
     // Iterate over active nodes to compute acceleratation and velocity
-    for (const auto& sub : subdomains) {
+    for (const auto& sub : subdomains)
       mesh_->iterate_over_nodes_predicate(
           std::bind(
               &mpm::NodeBase<Tdim>::compute_acceleration_velocity_subdomain,
               std::placeholders::_1, phase, this->dt_, sub["material_id"]),
           std::bind(&mpm::NodeBase<Tdim>::status, std::placeholders::_1));
-    }
 
     // Use nodal velocity to update position
     if (velocity_update_)
