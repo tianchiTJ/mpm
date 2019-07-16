@@ -258,19 +258,21 @@ bool mpm::MPMExplicitContact<Tdim>::solve() {
                     std::placeholders::_1, phase));
 
       //! Apply nodal tractions
-      for (const auto& sub : subdomains) {
-        // Get mesh properties
-        auto mesh_props = io_->json_object("mesh");
-        // Get Mesh reader from JSON object
-        const std::string reader =
-            mesh_props["mesh_reader"].template get<std::string>();
-        auto node_reader =
-            Factory<mpm::ReadMesh<Tdim>>::instance()->create(reader);
-        bool nodal_tractions_subdomain =
-            mesh_->assign_nodal_tractions_subdomain(
-                node_reader->read_particles_tractions(
-                    io_->file_name("nodal_tractions")),
-                sub["material_id"]);
+      if (nodal_tractions_) {
+        for (const auto& sub : subdomains) {
+          // Get mesh properties
+          auto mesh_props = io_->json_object("mesh");
+          // Get Mesh reader from JSON object
+          const std::string reader =
+              mesh_props["mesh_reader"].template get<std::string>();
+          auto node_reader =
+              Factory<mpm::ReadMesh<Tdim>>::instance()->create(reader);
+          bool nodal_tractions_subdomain =
+              mesh_->assign_nodal_tractions_subdomain(
+                  node_reader->read_particles_tractions(
+                      io_->file_name("nodal_tractions")),
+                  sub["material_id"]);
+        }
       }
     });
 
