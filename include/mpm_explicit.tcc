@@ -86,9 +86,87 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   // Check point resume
   if (resume) this->checkpoint_resume();
 
+  // Add new particle
+  // Status of add particle
+  bool add_particle = false;
+  if (particle_props.find("add_particle") != analysis_.end())
+    add_particle = particle_props["add_particle"].template get<bool>();
+  // Properties of new particle
+  // Start step of adding particle
+  mpm::Index apstep;
+  // Step interval of adding particle
+  mpm::Index apstep_inv;
+  // Start id of new particles
+  mpm::Index start_id;
+  // Material id of new particles
+  unsigned new_particle_mid;
+  // Initial volume of new particle
+  double new_particle_volume;
+  // Coordinates
+  Eigen::Matrix<double, Tdim, 1> new_particle_coordinates;
+      // Initial stress of new particle
+      Eigen::Matrix<double, 6, 1>
+          new_particle_stresses;
+  // Counter of new particle
+  mpm::Index counter_new_particle = 0;
+
+  if (add_particle) {
+    // Add particle properties
+    auto add_particle_props = particle_props["add_particle_props"];
+    // Assign time properties
+    apstep = add_particle_props["apstep"].template get<mpm::Index>();
+    apstep_inv = add_particle_props["apstep_inv"].template get<mpm::Index>();
+    // Assign start id of new particles
+    start_id = add_particle_props["start_id"].template get<mpm::Index>();
+    ;
+    // Assigne initial volume of new particle
+    new_particle_volume =
+        add_particle_props["new_particle_volume"].template get<double>();
+    // Get material from list of materials
+    new_particle_mid =
+        add_particle_props["new_particle_mid"].template get<unsigned>();
+    // Assigne initial coordinates of new particle
+    if (add_particle_props.at("new_particle_coordinates").is_array() &&
+        add_particle_props.at("new_particle_coordinates").size() == Tdim) {
+      for (unsigned i = 0; i < Tdim; ++i) {
+        new_particle_coordinates[i] =
+            add_particle_props.at("new_particle_coordinates").at(i);
+      }
+    } else {
+      throw std::runtime_error(
+          "Specified coordinates of the new particle dimension is invalid");
+    }
+    // Assigne initial stress of new particle
+    if (add_particle_props.at("new_particle_stress").is_array() &&
+        add_particle_props.at("new_particle_stress").size() == (Tdim * 2)) {
+      for (unsigned i = 0; i < (Tdim * 2); ++i) {
+        new_particle_stresses[i] =
+            add_particle_props.at("new_particle_stress").at(i);
+      }
+    } else {
+      throw std::runtime_error(
+          "Specified stress of the new particle dimension is invalid");
+    }
+  }
+
   auto solver_begin = std::chrono::steady_clock::now();
   // Main loop
   for (; step_ < nsteps_; ++step_) {
+
+    // Add new particle
+    if (add_particle && step_ >= apstep &&
+        (((step_ - apstep) % apstep_inv) == 0)) {
+      // New particle id
+      mpm::Index new_particle_id = start_id + counter_new_particle;
+      // Add new particle
+      this->add_new_particle(new_particle_id, new_particle_coordinates,
+                             new_particle_volume, new_particle_stresses);
+      // Assign material to new particle
+      mesh_->assign_new_particle_material(new_particle_id, phase,
+                                          materials_.at(new_particle_mid));
+      // Counter number of new particle
+      counter_new_particle++;
+    }
 
     if (mpi_rank == 0) console_->info("Step: {} of {}.\n", step_, nsteps_);
 

@@ -409,6 +409,45 @@ bool mpm::MPMBase<Tdim>::initialise_particles() {
   return status;
 }
 
+// Add new particles
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::add_new_particle(
+    const mpm::Index new_particle_id,
+    const Eigen::Matrix<double, Tdim, 1> coordinates, const double volume,
+    const Eigen::Matrix<double, 6, 1> stresses) {
+  // TODO: Fix phase
+  const unsigned phase = 0;
+  bool status = true;
+
+  try {
+    // Get particle properties
+    auto particle_props = io_->json_object("particle");
+
+    // Particle type
+    const auto particle_type =
+        particle_props["particle_type"].template get<std::string>();
+
+    // Add new particle
+    bool insert_status = mesh_->add_particle(
+        Factory<mpm::ParticleBase<Tdim>, mpm::Index,
+                const Eigen::Matrix<double, Tdim, 1>&>::instance()
+            ->create(particle_type, static_cast<mpm::Index>(new_particle_id),
+                     coordinates),
+        true);
+
+    bool add_particle = mesh_->locate_new_particle_cell(new_particle_id);
+    // Assign volume of new particle
+    mesh_->assign_new_particle_volume(new_particle_id, volume);
+
+    // Assign new particles stresses
+    mesh_->assign_new_particle_stresses(new_particle_id, stresses);
+  } catch (std::exception& exception) {
+    console_->error("#{}: Reading particles: {}", __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
 // Initialise materials
 template <unsigned Tdim>
 bool mpm::MPMBase<Tdim>::initialise_materials() {

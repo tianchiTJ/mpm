@@ -412,6 +412,13 @@ bool mpm::Mesh<Tdim>::locate_particle_cells(
   return status;
 }
 
+//! Locate a new particle in a cell
+template <unsigned Tdim>
+bool mpm::Mesh<Tdim>::locate_new_particle_cell(const mpm::Index id) {
+  bool status = this->locate_particle_cells(map_particles_[id]);
+  return status;
+}
+
 //! Iterate over particles
 template <unsigned Tdim>
 template <typename Toper>
@@ -633,6 +640,24 @@ bool mpm::Mesh<Tdim>::assign_particles_volumes(
   return status;
 }
 
+//! Assign a new particle's volume
+template <unsigned Tdim>
+bool mpm::Mesh<Tdim>::assign_new_particle_volume(const mpm::Index pid,
+                                                 const double volume) {
+  bool status = true;
+  const unsigned phase = 0;
+  try {
+    if (map_particles_.find(pid) != map_particles_.end())
+      status = map_particles_[pid]->assign_volume(phase, volume);
+    if (!status)
+      throw std::runtime_error("Cannot assign invalid particle volume");
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
 //! Compute and assign rotation matrix to nodes
 template <unsigned Tdim>
 bool mpm::Mesh<Tdim>::compute_nodal_rotation_matrices(
@@ -783,6 +808,38 @@ bool mpm::Mesh<Tdim>::assign_particles_stresses(
       (*pitr)->initial_stress(phase, particle_stresses.at(i));
       ++i;
     }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Assign new particles stresses
+template <unsigned Tdim>
+bool mpm::Mesh<Tdim>::assign_new_particle_stresses(
+    const mpm::Index id, const Eigen::Matrix<double, 6, 1> particle_stresses) {
+  bool status = true;
+  // TODO: Remove phase
+  const unsigned phase = 0;
+  try {
+    auto pitr = map_particles_[id];
+    pitr->initial_stress(phase, particle_stresses);
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Assign new particle stresses
+template <unsigned Tdim>
+bool mpm::Mesh<Tdim>::assign_new_particle_material(
+    const mpm::Index id, const unsigned phase, const std::shared_ptr<Material<Tdim>>& material) {
+  bool status = true;
+  try {
+    auto pitr = map_particles_[id];
+    pitr->assign_material(phase, material);
   } catch (std::exception& exception) {
     console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
     status = false;

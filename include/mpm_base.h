@@ -77,6 +77,12 @@ class MPMBase : public MPM {
   //! \param[in] resume_step Resume step
   bool resume_change_material(const mpm::Index resume_step);
 
+  // Add a new particle
+  bool add_new_particle(const mpm::Index new_particle_id,
+                        const Eigen::Matrix<double, Tdim, 1> coordinates,
+                        const double volume,
+                        const Eigen::Matrix<double, 6, 1> stresses);
+
  private:
   //! Return if a mesh will be isoparametric or not
   //! \retval isoparametric Status of mesh type

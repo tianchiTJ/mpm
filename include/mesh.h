@@ -189,6 +189,9 @@ class Mesh {
   //! \retval particles Particles which cannot be located in the mesh
   std::vector<std::shared_ptr<mpm::ParticleBase<Tdim>>> locate_particles_mesh();
 
+  // Locate a new particle in mesh cells
+  bool locate_new_particle_cell(const mpm::Index id);
+
   //! Iterate over particles
   //! \tparam Toper Callable object typically a baseclass functor
   template <typename Toper>
@@ -239,6 +242,11 @@ class Mesh {
   bool assign_particles_volumes(
       const std::vector<std::tuple<mpm::Index, double>>& particle_volumes);
 
+  //! Assign a new particle volumes
+  //! \param[in] pid New particle's id
+  //! \param[in] volumes Volume of the new particle
+  bool assign_new_particle_volume(const mpm::Index pid, const double volume);
+
   //! Assign particles tractions
   //! \param[in] particle_tractions Traction at dir on particle
   bool assign_particles_tractions(
@@ -261,6 +269,19 @@ class Mesh {
   //! \param[in] particle_stresses Initial stresses of particle
   bool assign_particles_stresses(
       const std::vector<Eigen::Matrix<double, 6, 1>>& particle_stresses);
+
+  //! Assign a new particle's stresses
+  //! \param[in] pid New particle's id
+  //! \param[in] particle_stresses Initial stresses of a new particle
+  bool assign_new_particle_stresses(
+      const mpm::Index id, const Eigen::Matrix<double, 6, 1> particle_stresses);
+
+  //! Assign a new particle's material
+  //! \param[in] pid New particle's id
+  //! \param[in] phase Index corresponding to the phase
+  //! \param[in] material Pointer to a material
+  bool assign_new_particle_material(
+      const mpm::Index id, const unsigned phase, const std::shared_ptr<Material<Tdim>>& material);
 
   //! Assign particles cells
   //! \param[in] particles_cells Particles and cells
