@@ -835,7 +835,8 @@ bool mpm::Mesh<Tdim>::assign_new_particle_stresses(
 //! Assign new particle stresses
 template <unsigned Tdim>
 bool mpm::Mesh<Tdim>::assign_new_particle_material(
-    const mpm::Index id, const unsigned phase, const std::shared_ptr<Material<Tdim>>& material) {
+    const mpm::Index id, const unsigned phase,
+    const std::shared_ptr<Material<Tdim>>& material) {
   bool status = true;
   try {
     auto pitr = map_particles_[id];

@@ -281,7 +281,8 @@ class Mesh {
   //! \param[in] phase Index corresponding to the phase
   //! \param[in] material Pointer to a material
   bool assign_new_particle_material(
-      const mpm::Index id, const unsigned phase, const std::shared_ptr<Material<Tdim>>& material);
+      const mpm::Index id, const unsigned phase,
+      const std::shared_ptr<Material<Tdim>>& material);
 
   //! Assign particles cells
   //! \param[in] particles_cells Particles and cells
