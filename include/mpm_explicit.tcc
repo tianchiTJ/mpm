@@ -42,6 +42,11 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   if (analysis_.find("strain_energy") != analysis_.end())
     strain_energy = analysis_["strain_energy"].template get<bool>();
 
+  // Test if reference coordinates is needed to be assigned
+  mpm::Index reference_step = 0;
+  if (analysis_.find("reference_step") != analysis_.end())
+    reference_step = analysis_["reference_step"].template get<mpm::Index>();
+
   // Pressure smoothing
   if (analysis_.find("pressure_smoothing") != analysis_.end())
     pressure_smoothing_ = analysis_["pressure_smoothing"].template get<bool>();
@@ -89,7 +94,7 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   // Add new particle
   // Status of add particle
   bool add_particle = false;
-  if (particle_props.find("add_particle") != analysis_.end())
+  if (particle_props.find("add_particle") != particle_props.end())
     add_particle = particle_props["add_particle"].template get<bool>();
   // Properties of new particle
   // Start step of adding particle
@@ -149,8 +154,7 @@ bool mpm::MPMExplicit<Tdim>::solve() {
           "Specified coordinates of the new particle dimension is invalid");
     }
     // Assigne initial stress of new particle
-    if (add_particle_props.at("new_particle_stress").is_array() &&
-        add_particle_props.at("new_particle_stress").size() == (Tdim * 2)) {
+    if (add_particle_props.at("new_particle_stress").is_array()) {
       new_particle_stresses[0] =
           add_particle_props.at("new_particle_stress").at(0);
       new_particle_stresses[1] =
@@ -415,6 +419,12 @@ bool mpm::MPMExplicit<Tdim>::solve() {
             std::bind(&mpm::ParticleBase<Tdim>::compute_strain_energy,
                       std::placeholders::_1, phase));
     }
+
+    if (step_ != 0 && step_ == reference_step)
+      // Iterate over each particle to assign reference coordinates
+      mesh_->iterate_over_particles(
+          std::bind(&mpm::ParticleBase<Tdim>::assign_reference_coordinates,
+                    std::placeholders::_1));
 
     // Locate particles
     auto unlocatable_particles = mesh_->locate_particles_mesh();

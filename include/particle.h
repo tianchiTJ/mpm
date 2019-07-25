@@ -290,6 +290,11 @@ class Particle : public ParticleBase<Tdim> {
   //! Apply particle velocity constraints
   void apply_particle_velocity_constraints() override;
 
+  // Assign reference coordinates
+  void assign_reference_coordinates() override {
+    this->coordinates_reference_ = coordinates_;
+  }
+
  private:
   //! particle id
   using ParticleBase<Tdim>::id_;

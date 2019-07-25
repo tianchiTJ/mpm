@@ -229,6 +229,9 @@ class ParticleBase {
   //! Apply particle velocity constraints
   virtual void apply_particle_velocity_constraints() = 0;
 
+  // Assign reference coordinates
+  virtual void assign_reference_coordinates() = 0;
+
  protected:
   //! particleBase id
   Index id_{std::numeric_limits<Index>::max()};
