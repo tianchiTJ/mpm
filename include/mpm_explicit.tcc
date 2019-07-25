@@ -154,7 +154,8 @@ bool mpm::MPMExplicit<Tdim>::solve() {
           "Specified coordinates of the new particle dimension is invalid");
     }
     // Assigne initial stress of new particle
-    if (add_particle_props.at("new_particle_stress").is_array()) {
+    if (add_particle_props.at("new_particle_stress").is_array() &&
+        add_particle_props.at("new_particle_stress").size() == 6) {
       new_particle_stresses[0] =
           add_particle_props.at("new_particle_stress").at(0);
       new_particle_stresses[1] =

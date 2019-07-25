@@ -292,7 +292,7 @@ class Particle : public ParticleBase<Tdim> {
 
   // Assign reference coordinates
   void assign_reference_coordinates() override {
-    this->coordinates_reference_ = coordinates_;
+    this->coordinates_reference_ = this->coordinates_;
   }
 
  private:
