@@ -169,6 +169,19 @@ mpirun -N 4 ./mpm -f ~/benchmarks/3d/uniaxial-stress -i mpm.json
     "particle": {
       "material_id": 0,
       "particle_type": "P2D",
+      "add_particle": {
+        "add_particle": true,
+        "apstep_start": 1000,
+        "apstep_end" : 10000,
+        "apstep_inv": 1000,
+        "ap_number" : 10,
+        "start_id" : 80000,
+        "new_particle_mid" : 4,
+        "new_particle_volume" : 0.01593,
+        "new_particle_coordinates" : [35.2, 21.9],
+        "apcoordinates_inv" : [0, 0.5],
+        "new_particle_stress" : [1000000, 1000000, 1000000, 0, 0, 0]
+        },
       "particle_sets": [
       {
         "set_id": 0,

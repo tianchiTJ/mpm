@@ -88,14 +88,12 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   mesh_->iterate_over_particles(std::bind(
       &mpm::ParticleBase<Tdim>::compute_mass, std::placeholders::_1, phase));
 
-  // Check point resume
-  if (resume) this->checkpoint_resume();
-
   // Add new particle
   // Status of add particle
   bool add_particle = false;
   if (particle_props.find("add_particle") != particle_props.end())
-    add_particle = particle_props["add_particle"].template get<bool>();
+    add_particle =
+        particle_props["add_particle"]["add_particle"].template get<bool>();
   // Properties of new particle
   // Start step of adding particle
   mpm::Index apstep_start;
@@ -122,7 +120,7 @@ bool mpm::MPMExplicit<Tdim>::solve() {
 
   if (add_particle) {
     // Add particle properties
-    auto add_particle_props = particle_props["add_particle_props"];
+    auto add_particle_props = particle_props["add_particle"];
     // Assign time properties
     apstep_start =
         add_particle_props["apstep_start"].template get<mpm::Index>();
@@ -154,8 +152,7 @@ bool mpm::MPMExplicit<Tdim>::solve() {
           "Specified coordinates of the new particle dimension is invalid");
     }
     // Assigne initial stress of new particle
-    if (add_particle_props.at("new_particle_stress").is_array() &&
-        add_particle_props.at("new_particle_stress").size() == 6) {
+    if (add_particle_props.at("new_particle_stress").is_array()) {
       new_particle_stresses[0] =
           add_particle_props.at("new_particle_stress").at(0);
       new_particle_stresses[1] =
@@ -174,6 +171,33 @@ bool mpm::MPMExplicit<Tdim>::solve() {
       throw std::runtime_error(
           "Specified stress of the new particle dimension is invalid");
     }
+  }
+
+  // Check point resume
+  if (resume) {
+    mpm::Index resume_step = analysis_["resume"]["step"];
+    if (resume_step > apstep_start) {
+      mpm::Index end_step = resume_step;
+      if (apstep_end < resume_step) end_step = apstep_end;
+      for (unsigned j = 0;
+           j < floor((end_step - apstep_start) / apstep_inv) + 1; ++j) {
+        for (unsigned i = 0; i < ap_number; ++i) {
+          // New particle id
+          mpm::Index new_particle_id = start_id + counter_new_particle;
+          // Add new particle
+          this->add_new_particle(
+              new_particle_id,
+              (new_particle_coordinates + apcoordinates_inv * i),
+              new_particle_volume, new_particle_stresses);
+          // Assign material to new particle
+          mesh_->assign_new_particle_material(new_particle_id, phase,
+                                              materials_.at(new_particle_mid));
+          // Counter number of new particle
+          counter_new_particle++;
+        }
+      }
+    }
+    this->checkpoint_resume();
   }
 
   auto solver_begin = std::chrono::steady_clock::now();
