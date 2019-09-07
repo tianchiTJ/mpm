@@ -101,7 +101,7 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   mpm::Index apstep_end;
   // Step interval of adding particle
   mpm::Index apstep_inv;
-  // Number of new particles in one adding step
+  // Number of new particles in one position
   unsigned ap_number;
   // Start id of new particles
   mpm::Index start_id;
@@ -119,6 +119,10 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   Eigen::Matrix<double, 6, 1> new_particle_stresses;
   // Counter of new particle
   mpm::Index counter_new_particle = 0;
+  // Counter of new particle in one position
+  mpm::Index counter_new_particle_position = 0;
+  // Number of position
+  int position = 0;
 
   if (add_particle) {
     // Add particle properties
@@ -194,20 +198,24 @@ bool mpm::MPMExplicit<Tdim>::solve() {
       if (apstep_end < resume_step) end_step = apstep_end;
       for (unsigned j = 0;
            j < floor((end_step - apstep_start) / apstep_inv) + 1; ++j) {
-        for (unsigned i = 0; i < ap_number; ++i) {
-          // New particle id
-          mpm::Index new_particle_id = start_id + counter_new_particle;
-          // Add new particle
-          this->add_new_particle(
-              new_particle_id,
-              (new_particle_coordinates + apcoordinates_inv * i),
-              new_particle_velocities, new_particle_volume,
-              new_particle_stresses);
-          // Assign material to new particle
-          mesh_->assign_new_particle_material(new_particle_id, phase,
-                                              materials_.at(new_particle_mid));
-          // Counter number of new particle
-          counter_new_particle++;
+        // New particle id
+        mpm::Index new_particle_id = start_id + counter_new_particle;
+        // Add new particle
+        this->add_new_particle(
+            new_particle_id,
+            (new_particle_coordinates + apcoordinates_inv * position),
+            new_particle_velocities, new_particle_volume,
+            new_particle_stresses);
+        // Assign material to new particle
+        mesh_->assign_new_particle_material(new_particle_id, phase,
+                                            materials_.at(new_particle_mid));
+        // Counter number of new particle
+        counter_new_particle++;
+        counter_new_particle_position++;
+        // Update grouting position
+        if (counter_new_particle_position == ap_number) {
+          counter_new_particle_position = 0;
+          position++;
         }
       }
     }
@@ -217,23 +225,26 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   auto solver_begin = std::chrono::steady_clock::now();
   // Main loop
   for (; step_ < nsteps_; ++step_) {
-
     // Add new particle
     if (add_particle && step_ >= apstep_start && step_ < apstep_end &&
         (((step_ - apstep_start) % apstep_inv) == 0)) {
-      for (unsigned i = 0; i < ap_number; ++i) {
-        // New particle id
-        mpm::Index new_particle_id = start_id + counter_new_particle;
-        // Add new particle
-        this->add_new_particle(
-            new_particle_id, (new_particle_coordinates + apcoordinates_inv * i),
-            new_particle_velocities, new_particle_volume,
-            new_particle_stresses);
-        // Assign material to new particle
-        mesh_->assign_new_particle_material(new_particle_id, phase,
-                                            materials_.at(new_particle_mid));
-        // Counter number of new particle
-        counter_new_particle++;
+      // New particle id
+      mpm::Index new_particle_id = start_id + counter_new_particle;
+      // Add new particle
+      this->add_new_particle(
+          new_particle_id,
+          (new_particle_coordinates + apcoordinates_inv * position),
+          new_particle_velocities, new_particle_volume, new_particle_stresses);
+      // Assign material to new particle
+      mesh_->assign_new_particle_material(new_particle_id, phase,
+                                          materials_.at(new_particle_mid));
+      // Counter number of new particle
+      counter_new_particle++;
+      counter_new_particle_position++;
+      // Update grouting position
+      if (counter_new_particle_position == ap_number) {
+        counter_new_particle_position = 0;
+        position++;
       }
     }
 
