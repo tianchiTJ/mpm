@@ -279,6 +279,11 @@ class Particle : public ParticleBase<Tdim> {
   //! $$\hat{p}_p = \sum_{i = 1}^{n_n} N_i(x_p) p_i$$
   double pressure(unsigned phase) const override { return pressure_(phase); }
 
+  //! Assign particle velocities
+  //! \param[in] velocities Particle velocities
+  bool assign_particle_velocities(
+      const Eigen::Matrix<double, Tdim, 1> velocities);
+
   //! Assign particle velocity constraints
   //! Directions can take values between 0 and Dim * Nphases
   //! \param[in] dir Direction of particle velocity constraint

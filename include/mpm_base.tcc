@@ -413,7 +413,8 @@ bool mpm::MPMBase<Tdim>::initialise_particles() {
 template <unsigned Tdim>
 bool mpm::MPMBase<Tdim>::add_new_particle(
     const mpm::Index new_particle_id,
-    const Eigen::Matrix<double, Tdim, 1> coordinates, const double volume,
+    const Eigen::Matrix<double, Tdim, 1> coordinates,
+    const Eigen::Matrix<double, Tdim, 1> velocities, const double volume,
     const Eigen::Matrix<double, 6, 1> stresses) {
   // TODO: Fix phase
   const unsigned phase = 0;
@@ -436,6 +437,9 @@ bool mpm::MPMBase<Tdim>::add_new_particle(
         true);
 
     bool add_particle = mesh_->locate_new_particle_cell(new_particle_id);
+    // Assign new particles velocities
+    mesh_->assign_new_particle_velocities(new_particle_id, velocities);
+
     // Assign volume of new particle
     mesh_->assign_new_particle_volume(new_particle_id, volume);
 

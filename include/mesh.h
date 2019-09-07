@@ -264,6 +264,12 @@ class Mesh {
   bool assign_particles_velocity_constraints(
       const std::vector<std::tuple<mpm::Index, unsigned, double>>&
           particle_velocity_constraints);
+  //! Assign new particles velocities
+  //! \param[in] new_particle_id New particle id
+  //! \param[in] velocities New particle velocities
+  bool assign_new_particle_velocities(
+      mpm::Index new_particle_id,
+      const Eigen::Matrix<double, Tdim, 1> velocities);
 
   //! Assign particles stresses
   //! \param[in] particle_stresses Initial stresses of particle

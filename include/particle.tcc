@@ -758,6 +758,22 @@ bool mpm::Particle<Tdim, Tnphases>::compute_pressure_smoothing(unsigned phase) {
   return status;
 }
 
+//! Assign particle velocities
+template <unsigned Tdim, unsigned Tnphases>
+bool mpm::Particle<Tdim, Tnphases>::assign_particle_velocities(
+    const Eigen::Matrix<double, Tdim, 1> velocities) {
+  bool status = true;
+  try {
+    const unsigned phase = 0;
+    for (unsigned i = 0; i < Tdim; ++i)
+      this->velocity_(i, phase) = velocities[i];
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
 //! Assign particle velocity constraint
 //! Constrain directions can take values between 0 and Dim * Nphases
 template <unsigned Tdim, unsigned Tnphases>

@@ -80,6 +80,7 @@ class MPMBase : public MPM {
   // Add a new particle
   bool add_new_particle(const mpm::Index new_particle_id,
                         const Eigen::Matrix<double, Tdim, 1> coordinates,
+                        const Eigen::Matrix<double, Tdim, 1> velocities,
                         const double volume,
                         const Eigen::Matrix<double, 6, 1> stresses);
 

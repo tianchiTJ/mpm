@@ -219,6 +219,10 @@ class ParticleBase {
   //! Return a state variable
   virtual double state_variable(const std::string& var) const = 0;
 
+  //! Assign particle velocities
+  virtual bool assign_particle_velocities(
+      const Eigen::Matrix<double, Tdim, 1> velocities) = 0;
+
   //! Assign particle velocity constraint
   //! Directions can take values between 0 and Dim * Nphases
   //! \param[in] dir Direction of particle velocity constraint

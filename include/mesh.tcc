@@ -755,6 +755,27 @@ bool mpm::Mesh<Tdim>::assign_particles_velocity_constraints(
   return status;
 }
 
+//! Assign new particles velocities
+template <unsigned Tdim>
+bool mpm::Mesh<Tdim>::assign_new_particle_velocities(
+    mpm::Index new_particle_id,
+    const Eigen::Matrix<double, Tdim, 1> velocities) {
+  bool status = true;
+  // TODO: Remove phase
+  const unsigned phase = 0;
+  try {
+    status =
+        map_particles_[new_particle_id]->assign_particle_velocities(velocities);
+
+    if (!status)
+      throw std::runtime_error("Velocity is invalid for new particle");
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
 //! Assign node tractions
 template <unsigned Tdim>
 bool mpm::Mesh<Tdim>::assign_nodal_tractions(

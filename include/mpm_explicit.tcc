@@ -109,8 +109,10 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   unsigned new_particle_mid;
   // Initial volume of new particle
   double new_particle_volume;
-  // Coordinates
+  // Initial coordinates of new particle
   Eigen::Matrix<double, Tdim, 1> new_particle_coordinates;
+  // Initial velocity of new particle
+  Eigen::Matrix<double, Tdim, 1> new_particle_velocities;
   // Incremental of coordinates
   Eigen::Matrix<double, Tdim, 1> apcoordinates_inv;
   // Initial stress of new particle
@@ -136,7 +138,7 @@ bool mpm::MPMExplicit<Tdim>::solve() {
         add_particle_props["new_particle_mid"].template get<unsigned>();
     // Assign number of new particles in one adding step
     ap_number = add_particle_props["ap_number"].template get<unsigned>();
-    // Assigne initial and incremental coordinates and of new particle
+    // Assigne initial and incremental coordinates of new particle
     if (add_particle_props.at("new_particle_coordinates").is_array() &&
         add_particle_props.at("new_particle_coordinates").size() == Tdim &&
         add_particle_props.at("apcoordinates_inv").is_array() &&
@@ -150,6 +152,17 @@ bool mpm::MPMExplicit<Tdim>::solve() {
     } else {
       throw std::runtime_error(
           "Specified coordinates of the new particle dimension is invalid");
+    }
+    // Assigne initial velocities of new particle
+    if (add_particle_props.at("new_particle_velocities").is_array() &&
+        add_particle_props.at("new_particle_velocities").size() == Tdim) {
+      for (unsigned i = 0; i < Tdim; ++i) {
+        new_particle_velocities[i] =
+            add_particle_props.at("new_particle_velocities").at(i);
+      }
+    } else {
+      throw std::runtime_error(
+          "Specified velocities of the new particle dimension is invalid");
     }
     // Assigne initial stress of new particle
     if (add_particle_props.at("new_particle_stress").is_array()) {
@@ -188,7 +201,8 @@ bool mpm::MPMExplicit<Tdim>::solve() {
           this->add_new_particle(
               new_particle_id,
               (new_particle_coordinates + apcoordinates_inv * i),
-              new_particle_volume, new_particle_stresses);
+              new_particle_velocities, new_particle_volume,
+              new_particle_stresses);
           // Assign material to new particle
           mesh_->assign_new_particle_material(new_particle_id, phase,
                                               materials_.at(new_particle_mid));
@@ -213,7 +227,8 @@ bool mpm::MPMExplicit<Tdim>::solve() {
         // Add new particle
         this->add_new_particle(
             new_particle_id, (new_particle_coordinates + apcoordinates_inv * i),
-            new_particle_volume, new_particle_stresses);
+            new_particle_velocities, new_particle_volume,
+            new_particle_stresses);
         // Assign material to new particle
         mesh_->assign_new_particle_material(new_particle_id, phase,
                                             materials_.at(new_particle_mid));
