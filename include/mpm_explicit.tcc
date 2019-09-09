@@ -109,8 +109,11 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   unsigned new_particle_mid;
   // Initial volume of new particle
   double new_particle_volume;
+  // Width of grouting colume
+  double column_width;
   // Initial coordinates of new particle
   Eigen::Matrix<double, Tdim, 1> new_particle_coordinates;
+  Eigen::Matrix<double, Tdim, 1> new_particle_coordinates_2;
   // Initial velocity of new particle
   Eigen::Matrix<double, Tdim, 1> new_particle_velocities;
   // Incremental of coordinates
@@ -134,6 +137,8 @@ bool mpm::MPMExplicit<Tdim>::solve() {
     apstep_inv = add_particle_props["apstep_inv"].template get<mpm::Index>();
     // Assign start id of new particles
     start_id = add_particle_props["start_id"].template get<mpm::Index>();
+    // Assigne initial width of grouting colume
+    column_width = add_particle_props["column_width"].template get<double>();
     // Assigne initial volume of new particle
     new_particle_volume =
         add_particle_props["new_particle_volume"].template get<double>();
@@ -157,6 +162,11 @@ bool mpm::MPMExplicit<Tdim>::solve() {
       throw std::runtime_error(
           "Specified coordinates of the new particle dimension is invalid");
     }
+    // Second grouting point
+    new_particle_coordinates_2 = new_particle_coordinates;
+    new_particle_coordinates_2[0] =
+        new_particle_coordinates_2[0] + column_width;
+
     // Assigne initial velocities of new particle
     if (add_particle_props.at("new_particle_velocities").is_array() &&
         add_particle_props.at("new_particle_velocities").size() == Tdim) {
@@ -211,6 +221,19 @@ bool mpm::MPMExplicit<Tdim>::solve() {
                                             materials_.at(new_particle_mid));
         // Counter number of new particle
         counter_new_particle++;
+        // Add new particle
+        this->add_new_particle(
+            (new_particle_id + 1),
+            (new_particle_coordinates_2 + apcoordinates_inv * position),
+            -new_particle_velocities, new_particle_volume,
+            new_particle_stresses);
+        // Assign material to new particle
+        mesh_->assign_new_particle_material((new_particle_id + 1), phase,
+                                            materials_.at(new_particle_mid));
+        // Counter number of new particle
+        counter_new_particle++;
+
+        // Counter number of new particle
         counter_new_particle_position++;
         // Update grouting position
         if (counter_new_particle_position == ap_number) {
@@ -240,6 +263,18 @@ bool mpm::MPMExplicit<Tdim>::solve() {
                                           materials_.at(new_particle_mid));
       // Counter number of new particle
       counter_new_particle++;
+      // Add new particle
+      this->add_new_particle(
+          (new_particle_id + 1),
+          (new_particle_coordinates_2 + apcoordinates_inv * position),
+          -new_particle_velocities, new_particle_volume, new_particle_stresses);
+      // Assign material to new particle
+      mesh_->assign_new_particle_material((new_particle_id + 1), phase,
+                                          materials_.at(new_particle_mid));
+      // Counter number of new particle
+      counter_new_particle++;
+
+      // Counter number of new particle
       counter_new_particle_position++;
       // Update grouting position
       if (counter_new_particle_position == ap_number) {
