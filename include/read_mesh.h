@@ -106,6 +106,11 @@ class ReadMesh {
       const std::string& particles_cells_file,
       const std::vector<std::array<mpm::Index, 2>>& particles_cells) = 0;
 
+  //
+  virtual void write_particles_removed(
+      const std::string& particles_removed_file, const mpm::Index step,
+      std::vector<mpm::Index> particles_removed) = 0;
+
 };  // ReadMesh class
 }  // namespace mpm
 

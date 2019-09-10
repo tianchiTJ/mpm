@@ -747,3 +747,35 @@ bool mpm::MPMBase<Tdim>::resume_change_material(const mpm::Index resume_step) {
   }
   return status;
 }
+
+//! Remove check
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::apply_remove_check(
+    const std::string& particles_removed_file) {
+  bool status = true;
+  const unsigned phase = 0;
+  // Get mesh properties
+  auto mesh_props = io_->json_object("mesh");
+  // Get Mesh reader from JSON object
+  const std::string reader =
+      mesh_props["mesh_reader"].template get<std::string>();
+  // Create a mesh reader
+  auto particle_reader =
+      Factory<mpm::ReadMesh<Tdim>>::instance()->create(reader);
+
+  try {
+    // Get ids of particle sets
+    std::vector<unsigned> sids = analysis_["remove_check"]["check_sets"];
+    // Get threshold value
+    const double remove_threshold = analysis_["remove_check"]["threshold"];
+    // Remove check
+    for (auto& sid : sids)
+      particle_reader->write_particles_removed(
+          particles_removed_file, this->step_,
+          mesh_->apply_remove_check(sid, remove_threshold));
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}

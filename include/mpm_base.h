@@ -77,6 +77,9 @@ class MPMBase : public MPM {
   //! \param[in] resume_step Resume step
   bool resume_change_material(const mpm::Index resume_step);
 
+  //! Remove check
+  bool apply_remove_check(const std::string& particles_removed_file);
+
  private:
   //! Return if a mesh will be isoparametric or not
   //! \retval isoparametric Status of mesh type

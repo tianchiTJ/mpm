@@ -532,3 +532,19 @@ void mpm::ReadMeshAscii<Tdim>::write_particles_cells(
 
   file.close();
 }
+
+//! Write particles removed by remove_check
+template <unsigned Tdim>
+void mpm::ReadMeshAscii<Tdim>::write_particles_removed(
+    const std::string& particles_removed_file, const mpm::Index step,
+    std::vector<mpm::Index> particles_removed) {
+
+  // output file stream
+  std::fstream file;
+  file.open(particles_removed_file.c_str(), std::ios::out);
+
+  for (const auto& particle : particles_removed)
+    file << particle << "\t" << step << "\n";
+
+  file.close();
+}

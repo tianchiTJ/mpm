@@ -94,6 +94,14 @@ class ReadMeshAscii : public ReadMesh<Tdim> {
       const std::string& particles_cells_file,
       const std::vector<std::array<mpm::Index, 2>>& particles_cells) override;
 
+  //! Write particles removed file
+  //! \param[in] particles_removed_file file name
+  //! \param[in] step Computation step
+  //! \param[in] particles_removed List of particles removed
+  void write_particles_removed(
+      const std::string& particles_removed_file, const mpm::Index step,
+      std::vector<mpm::Index> particles_removed) override;
+
  private:
   //! Logger
   std::shared_ptr<spdlog::logger> console_;

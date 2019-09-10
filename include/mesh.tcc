@@ -1402,3 +1402,39 @@ bool mpm::Mesh<Tdim>::resume_remove_particles(const mpm::Index resume_step) {
   }
   return status;
 }
+
+//! Apply remove check
+template <unsigned Tdim>
+std::vector<mpm::Index> mpm::Mesh<Tdim>::apply_remove_check(
+    const unsigned sid, const double remove_threshold) {
+  const unsigned phase = 0;
+
+  // Container of particles removed
+  std::vector<mpm::Index> particles_removed;
+
+  try {
+    // Particle set need to be checked
+    auto particle_set = particle_sets_.at(sid);
+    // Iterate over each particle in the set
+    for (auto particle = particle_set.cbegin(); particle != particle_set.cend();
+         particle++) {
+      Eigen::Matrix<double, 6, 1> stress = (*particle)->stress(phase);
+      // Remove particle from the mesh
+      if (stress(3) > remove_threshold) {
+        // Record particle id removed
+        particles_removed.push_back((*particle)->id());
+        // Remove particle from
+        this->remove_particle(*particle);
+        // Remove particle frome set
+        particle_set.remove(*particle);
+      }
+    }
+    // Update particle set checked
+    particle_sets_.erase(sid);
+    particle_sets_.insert(
+        std::pair<unsigned, Container<ParticleBase<Tdim>>>(sid, particle_set));
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+  }
+  return particles_removed;
+}
