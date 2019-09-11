@@ -771,8 +771,9 @@ bool mpm::MPMBase<Tdim>::apply_remove_check(
     // Remove check
     for (auto& sid : sids)
       particle_reader->write_particles_removed(
-          particles_removed_file, this->step_,
-          mesh_->apply_remove_check(sid, remove_threshold));
+          io_->output_file("particles-removed", ".txt", this->uuid_, 0, 0)
+              .string(),
+          this->step_, mesh_->apply_remove_check(sid, remove_threshold));
   } catch (std::exception& exception) {
     console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
     status = false;

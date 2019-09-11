@@ -1416,17 +1416,20 @@ std::vector<mpm::Index> mpm::Mesh<Tdim>::apply_remove_check(
     // Particle set need to be checked
     auto particle_set = particle_sets_.at(sid);
     // Iterate over each particle in the set
-    for (auto particle = particle_set.cbegin(); particle != particle_set.cend();
-         particle++) {
+    for (auto particle = particle_sets_.at(sid).cbegin();
+         particle != particle_sets_.at(sid).cend(); particle++) {
+      // Get the pointer of the current particle
+      auto particle_check = particle;
+      // Get stress
       Eigen::Matrix<double, 6, 1> stress = (*particle)->stress(phase);
       // Remove particle from the mesh
       if (stress(3) > remove_threshold) {
         // Record particle id removed
         particles_removed.push_back((*particle)->id());
-        // Remove particle from
-        this->remove_particle(*particle);
         // Remove particle frome set
         particle_set.remove(*particle);
+        // Remove particle from
+        this->remove_particle(*particle);
       }
     }
     // Update particle set checked
