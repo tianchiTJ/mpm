@@ -78,7 +78,7 @@ class MPMBase : public MPM {
   bool resume_change_material(const mpm::Index resume_step);
 
   //! Remove check
-  bool apply_remove_check(const std::string& particles_removed_file);
+  bool apply_remove_check();
 
  private:
   //! Return if a mesh will be isoparametric or not
@@ -121,6 +121,10 @@ class MPMBase : public MPM {
   //! (change material step, (material id, sets of particle sets))
   tsl::robin_map<mpm::Index, tsl::robin_map<mpm::Index, std::vector<unsigned>>>
       change_material_steps_;
+  //! Check set
+  std::vector<unsigned> check_sets_;
+  //! Remove set
+  std::vector<unsigned> remove_sets_;
 };  // MPMBase class
 }  // namespace mpm
 

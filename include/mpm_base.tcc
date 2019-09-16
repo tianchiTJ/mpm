@@ -35,6 +35,23 @@ mpm::MPMBase<Tdim>::MPMBase(std::unique_ptr<IO>&& io)
       throw std::runtime_error("Specified gravity dimension is invalid");
     }
 
+    // Remove check
+    bool remove_check = false;
+    if (analysis_.find("remove_check") != analysis_.end())
+      remove_check =
+          analysis_["remove_check"]["remove_check"].template get<bool>();
+    // Remove the set number
+    if (remove_check) {
+      std::vector<unsigned> check_sets =
+          analysis_["remove_check"]["check_sets"];
+      std::vector<unsigned> remove_sets =
+          analysis_["remove_check"]["remove_sets"];
+      for (unsigned i = 0; i < check_sets.size(); ++i) {
+        this->check_sets_.push_back(check_sets[i]);
+        this->remove_sets_.push_back(remove_sets[i]);
+      }
+    }
+
     // Velocity update
     try {
       velocity_update_ = analysis_["velocity_update"].template get<bool>();
@@ -750,30 +767,23 @@ bool mpm::MPMBase<Tdim>::resume_change_material(const mpm::Index resume_step) {
 
 //! Remove check
 template <unsigned Tdim>
-bool mpm::MPMBase<Tdim>::apply_remove_check(
-    const std::string& particles_removed_file) {
+bool mpm::MPMBase<Tdim>::apply_remove_check() {
   bool status = true;
   const unsigned phase = 0;
-  // Get mesh properties
-  auto mesh_props = io_->json_object("mesh");
-  // Get Mesh reader from JSON object
-  const std::string reader =
-      mesh_props["mesh_reader"].template get<std::string>();
-  // Create a mesh reader
-  auto particle_reader =
-      Factory<mpm::ReadMesh<Tdim>>::instance()->create(reader);
 
   try {
-    // Get ids of particle sets
-    std::vector<unsigned> sids = analysis_["remove_check"]["check_sets"];
     // Get threshold value
     const double remove_threshold = analysis_["remove_check"]["threshold"];
+    // Size of remove_check
+    int remove_num = this->check_sets_.size();
     // Remove check
-    for (auto& sid : sids)
-      particle_reader->write_particles_removed(
-          io_->output_file("particles-removed", ".txt", this->uuid_, 0, 0)
-              .string(),
-          this->step_, mesh_->apply_remove_check(sid, remove_threshold));
+    for (int i = 0; i < remove_num; ++i) {
+      if (this->check_sets_.at(i) != -1) {
+        bool remove_status = mesh_->apply_remove_check(
+            this->check_sets_[i], this->remove_sets_[i], remove_threshold);
+        if (remove_status) this->check_sets_.at(i) = -1;
+      }
+    }
   } catch (std::exception& exception) {
     console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
     status = false;

@@ -1405,39 +1405,42 @@ bool mpm::Mesh<Tdim>::resume_remove_particles(const mpm::Index resume_step) {
 
 //! Apply remove check
 template <unsigned Tdim>
-std::vector<mpm::Index> mpm::Mesh<Tdim>::apply_remove_check(
-    const unsigned sid, const double remove_threshold) {
+bool mpm::Mesh<Tdim>::apply_remove_check(const unsigned sid_check,
+                                         const unsigned sid_remove,
+                                         const double remove_threshold) {
   const unsigned phase = 0;
+  // Initialise remove status
+  bool remove_status = false;
 
   // Container of particles removed
   std::vector<mpm::Index> particles_removed;
 
   try {
-    // Particle set need to be checked
-    auto particle_set = particle_sets_.at(sid);
     // Iterate over each particle in the set
-    for (auto particle = particle_sets_.at(sid).cbegin();
-         particle != particle_sets_.at(sid).cend(); particle++) {
-      // Get the pointer of the current particle
-      auto particle_check = particle;
+    for (auto particle = particle_sets_.at(sid_check).cbegin();
+         particle != particle_sets_.at(sid_check).cend(); particle++) {
+
       // Get stress
-      Eigen::Matrix<double, 6, 1> stress = (*particle)->stress(phase);
+      double epds = (*particle)->state_variable("epds");
       // Remove particle from the mesh
-      if (stress(3) > remove_threshold) {
-        // Record particle id removed
-        particles_removed.push_back((*particle)->id());
-        // Remove particle frome set
-        particle_set.remove(*particle);
-        // Remove particle from
-        this->remove_particle(*particle);
+      if (epds > remove_threshold) {
+        remove_status = true;
+        break;
       }
     }
-    // Update particle set checked
-    particle_sets_.erase(sid);
-    particle_sets_.insert(
-        std::pair<unsigned, Container<ParticleBase<Tdim>>>(sid, particle_set));
+    // Remove particels set
+    if (remove_status) {
+      // Iterate over each particles in the set
+      for (auto particle_remove = particle_sets_.at(sid_remove).cbegin();
+           particle_remove != particle_sets_.at(sid_remove).cend();
+           particle_remove++) {
+        // Remove particle from the mesh
+        bool status = this->remove_particle(*particle_remove);
+        if (!status) throw std::runtime_error("Removing particle is invalid");
+      }
+    }
   } catch (std::exception& exception) {
     console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
   }
-  return particles_removed;
+  return remove_status;
 }

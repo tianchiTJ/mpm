@@ -47,9 +47,6 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   if (analysis_.find("remove_check") != analysis_.end())
     remove_check =
         analysis_["remove_check"]["remove_check"].template get<bool>();
-  // Create file to record particles removed
-  const std::string particles_removed_file =
-      io_->output_file("particles-removed", ".txt", this->uuid_, 0, 0).string();
 
   // Pressure smoothing
   if (analysis_.find("pressure_smoothing") != analysis_.end())
@@ -114,7 +111,7 @@ bool mpm::MPMExplicit<Tdim>::solve() {
       bool remove_status = mesh_->apply_remove_step(step_);
 
       // Remove check
-      if (remove_check) this->apply_remove_check(particles_removed_file);
+      if (remove_check) this->apply_remove_check();
 
       // Initialise nodes
       mesh_->iterate_over_nodes(

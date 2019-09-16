@@ -336,8 +336,8 @@ class Mesh {
   bool resume_remove_particles(const mpm::Index rstep);
 
   //! Apply remove check
-  std::vector<mpm::Index> apply_remove_check(const unsigned sid,
-                                             const double remove_threshold);
+  bool apply_remove_check(const unsigned sid_check, const unsigned sid_remove,
+                          const double remove_threshold);
 
  private:
   // Locate a particle in mesh cells
