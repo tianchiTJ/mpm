@@ -1408,6 +1408,7 @@ template <unsigned Tdim>
 bool mpm::Mesh<Tdim>::apply_remove_check(const unsigned sid_check,
                                          const unsigned sid_remove,
                                          const std::string check_item,
+                                         const bool remove_type,
                                          const double remove_threshold) {
   const unsigned phase = 0;
   // Initialise remove status
@@ -1423,16 +1424,22 @@ bool mpm::Mesh<Tdim>::apply_remove_check(const unsigned sid_check,
       if (check_item == "average_stress_x")
         indicator += (*particle)->stress(phase)[0] /
                      (particle_sets_.at(sid_check).size());
+      // Stress check
+      else if (check_item == "stress")
+        indicator = (*particle)->stress(phase)[0];
       // Plastic check
       else if (check_item == "epds")
         indicator = std::max((*particle)->state_variable("epds"), indicator);
       // Invalid item
       else
         throw std::runtime_error("Remove check item is invalid");
+      // Remove single particle
+      if (remove_type && fabs(indicator) > remove_threshold)
+        this->remove_particle(*particle);
     }
 
     // Remove particels set
-    if (indicator > remove_threshold) {
+    if (!remove_type && fabs(indicator) > remove_threshold) {
       remove_status = true;
       // Iterate over each particles in the set
       for (auto particle_remove = particle_sets_.at(sid_remove).cbegin();

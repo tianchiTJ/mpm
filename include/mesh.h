@@ -337,7 +337,7 @@ class Mesh {
 
   //! Apply remove check
   bool apply_remove_check(const unsigned sid_check, const unsigned sid_remove,
-                          const std::string check_item,
+                          const std::string check_item, const bool remove_type,
                           const double remove_threshold);
 
  private:
