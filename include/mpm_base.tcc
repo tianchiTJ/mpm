@@ -36,6 +36,7 @@ mpm::MPMBase<Tdim>::MPMBase(std::unique_ptr<IO>&& io)
     }
 
     // Remove check
+    // Default status as false of remove check
     bool remove_check = false;
     if (analysis_.find("remove_check") != analysis_.end())
       remove_check =
@@ -772,15 +773,19 @@ bool mpm::MPMBase<Tdim>::apply_remove_check() {
   const unsigned phase = 0;
 
   try {
-    // Get threshold value
-    const double remove_threshold = analysis_["remove_check"]["threshold"];
+    // Default check item
+    const std::string check_item = analysis_["remove_check"]["check_item"];
     // Size of remove_check
     int remove_num = this->check_sets_.size();
+    // Get threshold value
+    const std::vector<double> remove_threshold =
+        analysis_["remove_check"]["threshold"];
     // Remove check
     for (int i = 0; i < remove_num; ++i) {
       if (this->check_sets_.at(i) != -1) {
         bool remove_status = mesh_->apply_remove_check(
-            this->check_sets_[i], this->remove_sets_[i], remove_threshold);
+            this->check_sets_[i], this->remove_sets_[i], check_item,
+            remove_threshold[i]);
         if (remove_status) this->check_sets_.at(i) = -1;
       }
     }

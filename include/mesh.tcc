@@ -1407,36 +1407,42 @@ bool mpm::Mesh<Tdim>::resume_remove_particles(const mpm::Index resume_step) {
 template <unsigned Tdim>
 bool mpm::Mesh<Tdim>::apply_remove_check(const unsigned sid_check,
                                          const unsigned sid_remove,
+                                         const std::string check_item,
                                          const double remove_threshold) {
   const unsigned phase = 0;
   // Initialise remove status
   bool remove_status = false;
-
-  // Container of particles removed
-  std::vector<mpm::Index> particles_removed;
+  // Default value of indicator
+  double indicator = std::numeric_limits<double>::min();
 
   try {
     // Iterate over each particle in the set
     for (auto particle = particle_sets_.at(sid_check).cbegin();
          particle != particle_sets_.at(sid_check).cend(); particle++) {
-
-      // Get stress
-      double epds = (*particle)->state_variable("epds");
-      // Remove particle from the mesh
-      if (epds > remove_threshold) {
-        remove_status = true;
-        break;
-      }
+      // Average stress check
+      if (check_item == "average_stress_x")
+        indicator += (*particle)->stress(phase)[0] /
+                     (particle_sets_.at(sid_check).size());
+      // Plastic check
+      else if (check_item == "epds")
+        indicator = std::max((*particle)->state_variable("epds"), indicator);
+      // Invalid item
+      else
+        throw std::runtime_error("Remove check item is invalid");
     }
+
     // Remove particels set
-    if (remove_status) {
+    if (indicator > remove_threshold) {
+      remove_status = true;
       // Iterate over each particles in the set
       for (auto particle_remove = particle_sets_.at(sid_remove).cbegin();
            particle_remove != particle_sets_.at(sid_remove).cend();
            particle_remove++) {
         // Remove particle from the mesh
         bool status = this->remove_particle(*particle_remove);
-        if (!status) throw std::runtime_error("Removing particle is invalid");
+        if (!status)
+          throw std::runtime_error(
+              "Removing particle is invalid in remove check");
       }
     }
   } catch (std::exception& exception) {
