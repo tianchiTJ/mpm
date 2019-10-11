@@ -72,14 +72,18 @@ class CamClay : public Material<Tdim> {
   FailureState compute_yield_state(double* yield_function,
                                    const mpm::dense_map* state_vars);
 
-  //! Compute dF/dSigma and dP/dSigma
+  //! Compute dF/dSigma and dY/dSigma
   //! \param[in] state_vars History-dependent state variables
   //! \param[in] stress Stress
   //! \param[in] df_dsigma dF/dSigma
   //! \param[in] dp_dsigma dY/dSigma
+  void compute_df_dy(const mpm::dense_map* state_vars, const Vector6d& stress,
+                     Vector6d* df_dsigma, Vector6d* dy_dsigma);
+
+  //! Compute dF/dmul
+  //! \param[in] state_vars History-dependent state variables
   //! \param[in] df_dmul dF / dmultiplier
-  void compute_df_dp(const mpm::dense_map* state_vars, const Vector6d& stress,
-                     Vector6d* df_dsigma, Vector6d* dy_dsigma, double* df_dmul);
+  void compute_df_dmul(const mpm::dense_map* state_vars, double* df_dmul);
 
  protected:
   //! material id

@@ -154,12 +154,12 @@ typename mpm::CamClay<Tdim>::FailureState
   return yield_type;
 }
 
-//! Compute dF/dSigma and dP/dSigma
+//! Compute dF/dSigma and dY/dSigma
 template <unsigned Tdim>
-void mpm::CamClay<Tdim>::compute_df_dp(const mpm::dense_map* state_vars,
+void mpm::CamClay<Tdim>::compute_df_dy(const mpm::dense_map* state_vars,
                                        const Vector6d& stress,
-                                       Vector6d* df_dsigma, Vector6d* dy_dsigma,
-                                       double* df_dmul) {
+                                       Vector6d* df_dsigma,
+                                       Vector6d* dy_dsigma) {
   // Stress invariants
   const double p = (*state_vars).at("p");
   const double q = (*state_vars).at("q");
@@ -195,6 +195,31 @@ void mpm::CamClay<Tdim>::compute_df_dp(const mpm::dense_map* state_vars,
     dq_dsigma(4) = 0.;
     dq_dsigma(5) = 0.;
   }
+  // Compute dF / dSigma
+  (*df_dsigma) = (df_dp * dp_dsigma) + (df_dq * dq_dsigma);
+  if (Tdim == 2) {
+    (*df_dsigma)(4) = 0.;
+    (*df_dsigma)(5) = 0.;
+  }
+  // Compute dY / dsigma
+  (*dy_dsigma) = (*df_dsigma);
+}
+
+//! Compute dF/dmul
+template <unsigned Tdim>
+void mpm::CamClay<Tdim>::compute_df_dmul(const mpm::dense_map* state_vars,
+                                         double* df_dmul) {
+  // Stress invariants
+  const double p = (*state_vars).at("p");
+  const double q = (*state_vars).at("q");
+  // Preconsolidation pressure
+  const double pc = (*state_vars).at("pc");
+  // Compute dF / dp
+  double df_dp = 2 * p - pc;
+  // Compute dF / dq
+  double df_dq = 2 * q / (m_value_ * m_value_);
+  // Compute dF / dpc
+  double df_dpc = -p;
   // Upsilon
   double upsilon = (1 + (*state_vars).at("porosity")) / (lambda_ - kappa_);
   // A_den
@@ -214,14 +239,6 @@ void mpm::CamClay<Tdim>::compute_df_dp(const mpm::dense_map* state_vars,
   // Compute dq / dmultiplier
   double dq_dmul = -q;
   if (fabs(b_den) > 1.E-5) dq_dmul / b_den;
-  // Compute dF / dSigma
-  (*df_dsigma) = (df_dp * dp_dsigma) + (df_dq * dq_dsigma);
-  if (Tdim == 2) {
-    (*df_dsigma)(4) = 0.;
-    (*df_dsigma)(5) = 0.;
-  }
-  // Compute dY / dsigma
-  (*dy_dsigma) = (*df_dsigma);
   // Compute dF / dmultiplier
   (*df_dmul) = (df_dp * dp_dmul) + (df_dq * dq_dmul) + (df_dpc * dpc_dmul);
 }
@@ -270,13 +287,9 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
       (1 + (*state_vars).at("porosity")) / (lambda_ - kappa_);
   // Preconsolidation pressure of last step
   const double pc_n = (*state_vars).at("pc");
-  // Initialise partial differential
-  Vector6d df_dsigma = Vector6d::Zero();
-  Vector6d dy_dsigma = Vector6d::Zero();
+  // Compute dF / dmul
   double df_dmul = 0.;
-  // Compute partial differential
-  this->compute_df_dp(state_vars, trial_stress, &df_dsigma, &dy_dsigma,
-                      &df_dmul);
+  this->compute_df_dmul(state_vars, &df_dmul);
   // Iteration for consistency multiplier
   while (fabs(f_function) > Ftolerance && counter_f < itrstep) {
     // Update consistency multiplier
@@ -314,16 +327,17 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
     }
     // Update yield function
     yield_type = this->compute_yield_state(&f_function, state_vars);
-    // Compute partial differential
-    this->compute_df_dp(state_vars, trial_stress, &df_dsigma, &dy_dsigma,
-                        &df_dmul);
+    // Compute dF / dmul
+    this->compute_df_dmul(state_vars, &df_dmul);
     // Counter iteration step
     ++counter_f;
   }
   // Compute trial stress invariants
   this->compute_stress_invariants(trial_stress, state_vars);
-  // Update yield function
-  yield_type = this->compute_yield_state(&f_function, state_vars);
+  //! Compute dF/dSigma and dY/dSigma
+  Vector6d df_dsigma = Vector6d::Zero();
+  Vector6d dy_dsigma = Vector6d::Zero();
+  this->compute_df_dy(state_vars, stress, &df_dsigma, &dy_dsigma);
   // Incremental Volumetric strain
   double dvstrain = dstrain(0) + dstrain(1) + dstrain(2);
   // Update porosity
