@@ -97,6 +97,8 @@ class CamClay : public Material<Tdim> {
   // General parameters
   //! Density
   double density_{std::numeric_limits<double>::max()};
+  //! Youngs modulus
+  double youngs_modulus_{std::numeric_limits<double>::max()};
   //! Poisson ratio
   double poisson_ratio_{std::numeric_limits<double>::max()};
   //! Bulk modulus
@@ -114,8 +116,6 @@ class CamClay : public Material<Tdim> {
   double lambda_{std::numeric_limits<double>::max()};
   //! Kappa
   double kappa_{std::numeric_limits<double>::max()};
-  //! Consistency multiplier
-  double mul_{0};
 
 };  // CamClay class
 }  // namespace mpm
