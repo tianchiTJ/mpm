@@ -95,7 +95,7 @@ class CamClay : public Material<Tdim> {
 
  private:
   //! Compute elastic tensor
-  bool compute_elastic_tensor(const mpm::dense_map* state_vars);
+  bool compute_elastic_tensor(mpm::dense_map* state_vars);
   //! Elastic stiffness matrix
   Matrix6x6 de_;
   // General parameters
@@ -105,10 +105,6 @@ class CamClay : public Material<Tdim> {
   double youngs_modulus_{std::numeric_limits<double>::max()};
   //! Poisson ratio
   double poisson_ratio_{std::numeric_limits<double>::max()};
-  //! Bulk modulus
-  double bulk_modulus_{std::numeric_limits<double>::max()};
-  //! Shear modulus
-  double shear_modulus_{std::numeric_limits<double>::max()};
   //! Initial porosity
   double e0_{std::numeric_limits<double>::max()};
   // Cam Clay parameters

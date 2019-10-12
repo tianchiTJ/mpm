@@ -33,44 +33,51 @@ mpm::CamClay<Tdim>::CamClay(unsigned id, const Json& material_properties)
 //! Initialise state variables
 template <unsigned Tdim>
 mpm::dense_map mpm::CamClay<Tdim>::initialise_state_variables() {
-  mpm::dense_map state_vars = {// Stress invariants
-                               // J2
-                               {"j2", 0.},
-                               // J3
-                               {"j3", 0.},
-                               // Volumetric stress
-                               {"p", 0.},
-                               // Deviatoric stress
-                               {"q", 0.},
-                               // Lode's angle
-                               {"theta", 0.},
-                               // Preconsolidation pressure
-                               {"pc", p0_},
-                               // Porosity
-                               {"porosity", e0_},
-                               // Consistency multiplier
-                               {"multiplier", 0.}};
+  mpm::dense_map state_vars = {
+      // Elastic modulus
+      // Bulk modulus
+      {"bulk_modulus", youngs_modulus_},
+      // Shear modulus
+      {"shear_modulus", 3 * youngs_modulus_ * (1 - 2 * poisson_ratio_) /
+                            (2 * (1 + poisson_ratio_))},
+      // Stress invariants
+      // J2
+      {"j2", 0.},
+      // J3
+      {"j3", 0.},
+      // Volumetric stress
+      {"p", 0.},
+      // Deviatoric stress
+      {"q", 0.},
+      // Lode's angle
+      // {"theta", 0.},
+      // Cam clay parameters
+      // Preconsolidation pressure
+      {"pc", p0_},
+      // Porosity
+      {"porosity", e0_},
+      // Consistency multiplier
+      {"multiplier", 0.}};
 
   return state_vars;
 }
 
 //! Compute elastic tensor
 template <unsigned Tdim>
-bool mpm::CamClay<Tdim>::compute_elastic_tensor(
-    const mpm::dense_map* state_vars) {
+bool mpm::CamClay<Tdim>::compute_elastic_tensor(mpm::dense_map* state_vars) {
   // Bulk modulus
-  if ((*state_vars).at("p") < 0)
-    bulk_modulus_ = fabs((1 + (*state_vars).at("porosity")) / kappa_ *
-                         (*state_vars).at("p"));
-  else
-    bulk_modulus_ = youngs_modulus_ / (3.0 * (1. - 2. * poisson_ratio_));
-  // Shear modulus
-  shear_modulus_ =
-      3 * bulk_modulus_ * (1 - 2 * poisson_ratio_) / (2 * (1 + poisson_ratio_));
+  if ((*state_vars).at("p") > 0) {
+    (*state_vars).at("bulk_modulus") =
+        (1 + (*state_vars).at("porosity")) / kappa_ * (*state_vars).at("p");
+    // Shear modulus
+    (*state_vars).at("shear_modulus") = 3 * (*state_vars).at("bulk_modulus") *
+                                        (1 - 2 * poisson_ratio_) /
+                                        (2 * (1 + poisson_ratio_));
+  }
   // Components in stiffness matrix
-  const double G = shear_modulus_;
-  const double a1 = bulk_modulus_ + (4.0 / 3.0) * G;
-  const double a2 = bulk_modulus_ - (2.0 / 3.0) * G;
+  const double G = (*state_vars).at("shear_modulus");
+  const double a1 = (*state_vars).at("bulk_modulus") + (4.0 / 3.0) * G;
+  const double a2 = (*state_vars).at("bulk_modulus") - (2.0 / 3.0) * G;
   // compute elastic stiffness matrix
   // clang-format off
   de_(0,0)=a1;    de_(0,1)=a2;    de_(0,2)=a2;    de_(0,3)=0;    de_(0,4)=0;    de_(0,5)=0;
@@ -88,12 +95,12 @@ template <unsigned Tdim>
 bool mpm::CamClay<Tdim>::compute_stress_invariants(const Vector6d& stress,
                                                    mpm::dense_map* state_vars) {
   // Compute volumetic stress
-  (*state_vars).at("p") = (stress(0) + stress(1) + stress(2)) / 3.;
+  (*state_vars).at("p") = -(stress(0) + stress(1) + stress(2)) / 3.;
   // Compute the deviatoric stress
   Vector6d dev_stress = Vector6d::Zero();
-  dev_stress(0) = stress(0) - (*state_vars).at("p");
-  dev_stress(1) = stress(1) - (*state_vars).at("p");
-  dev_stress(2) = stress(2) - (*state_vars).at("p");
+  dev_stress(0) = stress(0) + (*state_vars).at("p");
+  dev_stress(1) = stress(1) + (*state_vars).at("p");
+  dev_stress(2) = stress(2) + (*state_vars).at("p");
   dev_stress(3) = stress(3);
   if (Tdim == 3) {
     dev_stress(4) = stress(4);
@@ -114,22 +121,21 @@ bool mpm::CamClay<Tdim>::compute_stress_invariants(const Vector6d& stress,
         ((2 * dev_stress(3) * dev_stress(4) * dev_stress(5)) -
          (dev_stress(0) * pow(dev_stress(4), 2)) -
          (dev_stress(1) * pow(dev_stress(5), 2)));
-  // Compute theta value (Lode angle)
-  double theta_val = 0.;
-  if (fabs((*state_vars).at("j2")) > 0.0)
-    theta_val = (3. * sqrt(3.) / 2.) *
-                ((*state_vars).at("j3") / pow((*state_vars).at("j2"), 1.5));
-  // Check theta value
-  if (theta_val > 1.0) theta_val = 1.0;
-  if (theta_val < -1.0) theta_val = -1.0;
-  // Compute theta
-  (*state_vars)["theta"] = (1. / 3.) * acos(theta_val);
-  // Check theta
-  if ((*state_vars).at("theta") > M_PI / 3.) (*state_vars)["theta"] = M_PI / 3.;
-  if ((*state_vars).at("theta") < 0.0) (*state_vars)["theta"] = 0.;
   // Compute q
   (*state_vars)["q"] = sqrt(3 * ((*state_vars).at("j2")));
-
+  // Compute theta value (Lode angle)
+  // double theta_val = 0.;
+  // if (fabs((*state_vars).at("j2")) > 0.0)
+  //  theta_val = (3. * sqrt(3.) / 2.) *
+  //              ((*state_vars).at("j3") / pow((*state_vars).at("j2"), 1.5));
+  // Check theta value
+  // if (theta_val > 1.0) theta_val = 1.0;
+  // if (theta_val < -1.0) theta_val = -1.0;
+  // Compute theta
+  // (*state_vars)["theta"] = (1. / 3.) * acos(theta_val);
+  // Check theta
+  // if ((*state_vars).at("theta") > M_PI / 3.) (*state_vars)["theta"] = M_PI
+  // / 3.; if ((*state_vars).at("theta") < 0.0) (*state_vars)["theta"] = 0.;
   return true;
 }
 
@@ -167,9 +173,9 @@ void mpm::CamClay<Tdim>::compute_df_dy(const mpm::dense_map* state_vars,
   const double pc = (*state_vars).at("pc");
   // Compute deviatoric stress
   Vector6d dev_stress = Vector6d::Zero();
-  dev_stress(0) = stress(0) - p;
-  dev_stress(1) = stress(1) - p;
-  dev_stress(2) = stress(2) - p;
+  dev_stress(0) = stress(0) + p;
+  dev_stress(1) = stress(1) + p;
+  dev_stress(2) = stress(2) + p;
   dev_stress(3) = stress(3);
   if (Tdim == 3) {
     dev_stress(4) = stress(4);
@@ -183,14 +189,12 @@ void mpm::CamClay<Tdim>::compute_df_dy(const mpm::dense_map* state_vars,
   double df_dpc = -p;
   // Compute dp / dSigma
   Vector6d dp_dsigma = Vector6d::Zero();
-  dp_dsigma(0) = 1. / 3.;
-  dp_dsigma(1) = 1. / 3.;
-  dp_dsigma(2) = 1. / 3.;
+  dp_dsigma(0) = -1. / 3.;
+  dp_dsigma(1) = -1. / 3.;
+  dp_dsigma(2) = -1. / 3.;
   // Compute dq / dSigma
-  Vector6d dq_dsigma = Vector6d::Zero();
-  double multiplier = 1.;
-  if (fabs(q) > 0.) multiplier = 1.5 / q;
-  dq_dsigma = multiplier * dev_stress;
+  Vector6d dq_dsigma = dev_stress;
+  if (fabs(q) > 0.) dq_dsigma = 1.5 / q * dev_stress;
   if (Tdim == 2) {
     dq_dsigma(4) = 0.;
     dq_dsigma(5) = 0.;
@@ -223,10 +227,10 @@ void mpm::CamClay<Tdim>::compute_df_dmul(const mpm::dense_map* state_vars,
   // Upsilon
   double upsilon = (1 + (*state_vars).at("porosity")) / (lambda_ - kappa_);
   // A_den
-  double a_den =
-      1 + (2 * bulk_modulus_ + upsilon * pc) * (*state_vars).at("multiplier");
+  double a_den = 1 + (2 * (*state_vars).at("bulk_modulus") + upsilon * pc) *
+                         (*state_vars).at("multiplier");
   // Compute dp / dmultiplier
-  double dp_dmul = -bulk_modulus_;
+  double dp_dmul = -(*state_vars).at("bulk_modulus");
   // Compute dpc / dmultiplier
   double dpc_dmul = upsilon * pc;
   if (fabs(a_den) > 1.E-5) {
@@ -235,7 +239,7 @@ void mpm::CamClay<Tdim>::compute_df_dmul(const mpm::dense_map* state_vars,
   }
   // B_den
   double b_den = (*state_vars).at("multiplier") +
-                 m_value_ * m_value_ / (6 * shear_modulus_);
+                 m_value_ * m_value_ / (6 * (*state_vars).at("shear_modulus"));
   // Compute dq / dmultiplier
   double dq_dmul = -q;
   if (fabs(b_den) > 1.E-5) dq_dmul / b_den;
@@ -257,7 +261,7 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
   // Maximum subiteration step number
   const int substep = 100;
   // Update volumetric stress
-  (*state_vars).at("p") = (stress(0) + stress(1) + stress(2)) / 3.;
+  (*state_vars).at("p") = -(stress(0) + stress(1) + stress(2)) / 3.;
   // Set elastic tensor
   this->compute_elastic_tensor(state_vars);
   //-------------------------------------------------------------------------
@@ -296,18 +300,21 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
     if (fabs(df_dmul) > 1.E-5)
       (*state_vars).at("multiplier") -= f_function / df_dmul;
     // Update volumetric stress
-    (*state_vars).at("p") =
-        p_trial - bulk_modulus_ * (*state_vars).at("multiplier") *
-                      (2 * (*state_vars).at("p") - (*state_vars).at("pc"));
+    (*state_vars).at("p") = (p_trial + (*state_vars).at("bulk_modulus") *
+                                           (*state_vars).at("multiplier") *
+                                           (*state_vars).at("pc")) /
+                            (1 + 2 * (*state_vars).at("bulk_modulus") *
+                                     (*state_vars).at("multiplier"));
     // Update deviatoric stress
     (*state_vars).at("q") =
-        q_trial / (1 + 6 * shear_modulus_ * (*state_vars).at("multiplier") /
-                           (m_value_ * m_value_));
-
+        q_trial /
+        (1 + 6 * (*state_vars).at("shear_modulus") *
+                 (*state_vars).at("multiplier") / (m_value_ * m_value_));
     // Exponential index
     double e_index = upsilon * (*state_vars).at("multiplier") *
                      (2 * p_trial - (*state_vars).at("pc")) /
-                     (1 + 2 * (*state_vars).at("multiplier") * bulk_modulus_);
+                     (1 + 2 * (*state_vars).at("multiplier") *
+                              (*state_vars).at("bulk_modulus"));
     // Compute consistency multiplier function
     double g_function = pc_n * exp(e_index) - (*state_vars).at("pc");
     // Subiteraction for preconsolidation pressure
@@ -319,7 +326,8 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
       // Update exponential index
       e_index = upsilon * (*state_vars).at("multiplier") *
                 (2 * p_trial - (*state_vars).at("pc")) /
-                (1 + 2 * (*state_vars).at("multiplier") * bulk_modulus_);
+                (1 + 2 * (*state_vars).at("multiplier") *
+                         (*state_vars).at("bulk_modulus"));
       // Update consistency multiplier function
       g_function = pc_n * exp(e_index) - (*state_vars).at("pc");
       // Counter subiteration step
