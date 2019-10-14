@@ -72,18 +72,19 @@ class CamClay : public Material<Tdim> {
   FailureState compute_yield_state(double* yield_function,
                                    const mpm::dense_map* state_vars);
 
-  //! Compute dF/dSigma and dY/dSigma
-  //! \param[in] state_vars History-dependent state variables
-  //! \param[in] stress Stress
-  //! \param[in] df_dsigma dF/dSigma
-  //! \param[in] dp_dsigma dY/dSigma
-  void compute_df_dy(const mpm::dense_map* state_vars, const Vector6d& stress,
-                     Vector6d* df_dsigma, Vector6d* dy_dsigma);
-
   //! Compute dF/dmul
   //! \param[in] state_vars History-dependent state variables
   //! \param[in] df_dmul dF / dmultiplier
   void compute_df_dmul(const mpm::dense_map* state_vars, double* df_dmul);
+
+  //! Compute G and dG/dpc
+  //! \param[in] state_vars History-dependent state variables
+  //! \param[in] pc_n Preconsolidation pressure of last step
+  //! \param[in] p_trial Volumetric trial stress
+  //! \param[in] g_function G
+  //! \param[in] dg_dpc dG / dpc
+  void compute_dg_dpc(const mpm::dense_map* state_vars, const double pc_n,
+                      const double p_trial, double* g_function, double* dg_dpc);
 
  protected:
   //! material id
@@ -96,8 +97,13 @@ class CamClay : public Material<Tdim> {
  private:
   //! Compute elastic tensor
   bool compute_elastic_tensor(mpm::dense_map* state_vars);
+  //! Compute plastic tensor
+  bool compute_plastic_tensor(const Vector6d& stress,
+                              mpm::dense_map* state_vars);
   //! Elastic stiffness matrix
   Matrix6x6 de_;
+  //! Plastic stiffness matrix
+  Matrix6x6 dp_;
   // General parameters
   //! Density
   double density_{std::numeric_limits<double>::max()};
