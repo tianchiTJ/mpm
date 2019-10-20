@@ -4,6 +4,7 @@
 #include "material/newtonian.h"
 #include "material/mohr_coulomb.h"
 #include "material/cam_clay.h"
+#include "material/cam_clay_finite_strain.h"
 
 // Bingham 2D
 static Register<mpm::Material<2>, mpm::Bingham<2>, unsigned, const Json&>
@@ -44,3 +45,11 @@ static Register<mpm::Material<2>, mpm::CamClay<2>, unsigned, const Json&>
 // CamClay 3D
 static Register<mpm::Material<3>, mpm::CamClay<3>, unsigned, const Json&>
     cam_clay_3d("CamClay3D");
+
+// CamClay 2D with finite strain
+static Register<mpm::Material<2>, mpm::CamClayFiniteStrain<2>, unsigned, const Json&>
+    cam_clay_finite_strain_2d("CamClayFiniteStrain2D");
+
+// CamClay 3D with finite strain
+static Register<mpm::Material<3>, mpm::CamClayFiniteStrain<3>, unsigned, const Json&>
+    cam_clay_finite_strain_3d("CamClayFiniteStrain3D");

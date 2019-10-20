@@ -108,9 +108,9 @@ bool mpm::CamClay<Tdim>::compute_plastic_tensor(const Vector6d& stress,
                      upsilon * p * pc * df_dp;
   // Coefficients in plastic stiffness matrix
   const double a1 = pow(((*state_vars).at("bulk_modulus") * df_dp), 2);
-  const double a2 = -sqrt(1.5) * (*state_vars).at("bulk_modulus") * df_dp *
+  const double a2 = -sqrt(6) * (*state_vars).at("bulk_modulus") * df_dp *
                     (*state_vars).at("shear_modulus") * df_dq;
-  const double a3 = 1.5 * pow(((*state_vars).at("shear_modulus") * df_dq), 2);
+  const double a3 = 6 * pow(((*state_vars).at("shear_modulus") * df_dq), 2);
   // Compute the deviatoric stress
   Vector6d dev_stress = Vector6d::Zero();
   dev_stress(0) = stress(0) + p;
@@ -351,8 +351,13 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
   this->compute_plastic_tensor(stress, state_vars);
   // Check yield function
   (*state_vars).at("f_function") = f_function;
+  // Modified dstrain
+  Vector6d dstrain_m = dstrain;
+  dstrain_m(3) *= 0.5;
+  dstrain_m(4) *= 0.5;
+  dstrain_m(5) *= 0.5;
   // Compte current stress
-  Vector6d updated_stress = trial_stress - this->dp_ * dstrain;
+  Vector6d updated_stress = trial_stress - this->dp_ * dstrain_m;
   // Incremental Volumetric strain
   double dvstrain = dstrain(0) + dstrain(1) + dstrain(2);
   // Update porosity
