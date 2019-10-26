@@ -86,13 +86,11 @@ class CamClayFiniteStrain : public Material<Tdim> {
                               mpm::dense_map* state_vars);
 
   //! Compute strain invariants
-  //! \param[in] stress Stress
   //! \param[in] dstress Stress
   //! \param[in] dstrain Strain
   //! \param[in] state_vars History-dependent state variables
   //! \retval status of computation of strain invariants
-  bool compute_strain_invariants(const Vector6d& stress,
-                                 const Vector6d& dstress,
+  bool compute_strain_invariants(const Vector6d& dstress,
                                  const Vector6d& dstrain,
                                  mpm::dense_map* state_vars);
 
@@ -156,6 +154,8 @@ class CamClayFiniteStrain : public Material<Tdim> {
   double p0_{std::numeric_limits<double>::max()};
   //! Elastic volumetic strain
   double evstrain0_{std::numeric_limits<double>::max()};
+  //! Plastic volumetic strain
+  double pvstrain0_{std::numeric_limits<double>::max()};
   // Cam Clay parameters
   //! M
   double m_value_{std::numeric_limits<double>::max()};
@@ -168,9 +168,9 @@ class CamClayFiniteStrain : public Material<Tdim> {
   //! Kappa
   double kappa_{std::numeric_limits<double>::max()};
   //! Lambda in finite deformation
-  double lambda_f_{std::numeric_limits<double>::max()};
+  double lambda_fs_{std::numeric_limits<double>::max()};
   //! Kappa in finite deformation
-  double kappa_f_{std::numeric_limits<double>::max()};
+  double kappa_fs_{std::numeric_limits<double>::max()};
 
 };  // CamClayFiniteStrain class
 }  // namespace mpm

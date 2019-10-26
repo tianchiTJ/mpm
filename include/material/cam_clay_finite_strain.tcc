@@ -15,12 +15,15 @@ mpm::CamClayFiniteStrain<Tdim>::CamClayFiniteStrain(
     // Poisson ratio
     poisson_ratio_ =
         material_properties["poisson_ratio"].template get<double>();
+    // Initial status
     // Initial porosity
     e0_ = material_properties["e0"].template get<double>();
     // Initial volumetic stress
     p0_ = material_properties["p0"].template get<double>();
     // Initial elastic volumetic strain
     evstrain0_ = material_properties["evstrain0"].template get<double>();
+    // Initial plastic volumetic strain
+    pvstrain0_ = material_properties["pvstrain0"].template get<double>();
     // Properties
     properties_ = material_properties;
     // Cam Clay parameters
@@ -35,9 +38,9 @@ mpm::CamClayFiniteStrain<Tdim>::CamClayFiniteStrain(
     // Kappa
     kappa_ = material_properties["kappa"].template get<double>();
     // Lambda in finite deformation
-    lambda_f_ = lambda_ / (1. - lambda_);
+    lambda_fs_ = lambda_ / (1. - lambda_);
     // Kappa in finite deformation
-    kappa_f_ = kappa_ / (1. - kappa_);
+    kappa_fs_ = kappa_ / (1. - kappa_);
 
   } catch (std::exception& except) {
     console_->error("Material parameter not set: {}\n", except.what());
@@ -59,20 +62,23 @@ mpm::dense_map mpm::CamClayFiniteStrain<Tdim>::initialise_state_variables() {
                                {"q", 0.},
                                // Lode's angle
                                // {"theta", 0.},
-                               // Strain components
+                               // Elastic strain
+                               // Elastic strain components
+                               {"estrain0", 0.},
+                               {"estrain1", 0.},
+                               {"estrain2", 0.},
+                               {"estrain3", 0.},
+                               {"estrain4", 0.},
+                               {"estrain5", 0.},
                                // Elastic volumetric strain
-                               {"evstrain", 0.},
+                               {"evstrain", evstrain0_},
                                // Elastic deviatoric strain
                                {"esstrain", 0.},
-                               // Plastic volumetric strain
-                               {"pvstrain", 0.},
-                               // Plastic deviatoric strain
-                               {"psstrain", 0.},
+                               // Cam clay parameters
                                // Omega
                                {"omega", 0.},
                                // consistency parameter
                                {"delta_phi", 0.},
-                               // Cam clay parameters
                                // Preconsolidation pressure
                                {"pc", pc0_},
                                // Porosity
@@ -90,11 +96,10 @@ bool mpm::CamClayFiniteStrain<Tdim>::compute_elastic_modulus(
   if ((*state_vars).at("p") > 0) {
     // Compute bulk modulus
     (*state_vars).at("bulk_modulus") =
-        (1 + (*state_vars).at("porosity")) / kappa_ * (*state_vars).at("p");
+        (1 + (*state_vars).at("porosity")) / kappa_fs_ * (*state_vars).at("p");
     // Compute shear modulus
     (*state_vars).at("shear_modulus") =
-        mu0_ +
-        alpha_ / kappa_f_ * (-p0_ * kappa_f_ * exp((*state_vars).at("omega")));
+        mu0_ - alpha_ * p0_ * exp((*state_vars).at("omega"));
     // Computation status
     status = true;
   }
@@ -188,17 +193,37 @@ bool mpm::CamClayFiniteStrain<Tdim>::compute_plastic_tensor(
 //! Compute strain invariants
 template <unsigned Tdim>
 bool mpm::CamClayFiniteStrain<Tdim>::compute_strain_invariants(
-    const Vector6d& stress, const Vector6d& dstress, const Vector6d& dstrain,
-    mpm::dense_map* state_vars) {
+    const Vector6d& dstrain, mpm::dense_map* state_vars) {
   // Compute elastic volumetic strain
   (*state_vars).at("evstrain") -= (dstrain(0) + dstrain(1) + dstrain(2));
-  // Compute incremental elastic deviatoric stress
-  Vector6d dsstress = dstress;
-  for (int i = 0; i < 3; ++i)
-    dsstress(i) += (dstress(0) + dstress(1) + dstress(2)) / 3.;
-  // Update elastic deviatoric strain
-  (*state_vars).at("esstrain") +=
-      ((dstrain.dot(dsstress)) / (*state_vars).at("q"));
+  // Update elastic strain
+  (*state_vars).at("estrain0") += dstrain(0);
+  (*state_vars).at("estrain1") += dstrain(1);
+  (*state_vars).at("estrain2") += dstrain(2);
+  (*state_vars).at("estrain3") += dstrain(3) / 2.;
+  if (Tdim == 3) {
+    (*state_vars).at("estrain4") += strain(4) / 2.;
+    (*state_vars).at("estrain5") += strain(5) / 2.;
+  }
+  // Compute the elastic deviatoric strain
+  Vector6d edev_strain = Vector6d::Zero();
+  edev_strain(0) = (*state_vars).at("estrain0") + (*state_vars).at("evstrain");
+  edev_strain(1) = (*state_vars).at("estrain1") + (*state_vars).at("evstrain");
+  edev_strain(2) = (*state_vars).at("estrain2") + (*state_vars).at("evstrain");
+  edev_strain(3) = (*state_vars).at("estrain3");
+  if (Tdim == 3) {
+    edev_strain(4) = (*state_vars).at("estrain4");
+    edev_strain(5) = (*state_vars).at("estrain5");
+  }
+  // Compute I2
+  double i2 = (pow((edev_strain(0) - edev_strain(1)), 2) +
+               pow((edev_strain(1) - edev_strain(2)), 2) +
+               pow((edev_strain(0) - edev_strain(2)), 2)) /
+                  6.0 +
+              pow(edev_strain(3), 2);
+  if (Tdim == 3) i2 += pow(edev_strain(4), 2) + pow(edev_strain(5), 2);
+  // Compute deviatoric strain
+  (*state_vars).at("esstrain") = sqrt(4. / 3. * i2);
 
   return true;
 }
@@ -296,14 +321,14 @@ void mpm::CamClayFiniteStrain<Tdim>::compute_hessian_matrix(
   // Stress invariants
   const double p = (*state_vars).at("p");
   // Compute plastic hardening modulus
-  const double k_p = 1. / (lambda_f_ - kappa_f_) * (*state_vars).at("pc");
+  const double k_p = (*state_vars).at("pc") / (lambda_fs_ - kappa_fs_);
   // Initialise Hessian matrix
   Matrix3x3 hessian_psi, hessian_psi_f;
   // Compute Hessian matrix of Psi
-  hessian_psi(0, 0) = -p / kappa_f_;
+  hessian_psi(0, 0) = -p / kappa_fs_;
   hessian_psi(1, 1) = 3 * (*state_vars).at("shear_modulus");
   hessian_psi(0, 1) = hessian_psi(1, 0) =
-      3 * p0_ * alpha_ * (*state_vars).at("esstrain") / kappa_f_ *
+      3 * p0_ * alpha_ * (*state_vars).at("esstrain") / kappa_fs_ *
       exp((*state_vars).at("omega"));
   /// Compute Hessian matrix of yield function
   hessian_psi_f(0, 0) = 2 * hessian_psi(0, 0);
@@ -330,26 +355,37 @@ template <unsigned Tdim>
 Eigen::Matrix<double, 6, 1> mpm::CamClayFiniteStrain<Tdim>::compute_stress(
     const Vector6d& stress, const Vector6d& dstrain,
     const ParticleBase<Tdim>* ptr, mpm::dense_map* state_vars) {
-  // Tolerance for yield function
-  const double Ftolerance = 1.E-1;
+  // Phase
+  const unsigned phase = 0;
   // Maximum iteration step number
   const int itrstep = 100;
   // Maximum subiteration step number
   const int substep = 100;
+  // Tolerance for yield function
+  const double Ftolerance = 1.E-1;
+  // Get current strain vector
+  const Vector6d strain = (*ptr)->strain(phase);
+  // Compute Jacobian
+  const double jacobian = exp(-strain(0) - strain(1) - strain(2));
   // Update volumetric stress
-  (*state_vars).at("p") = -(stress(0) + stress(1) + stress(2)) / 3.;
+  (*state_vars).at("p") = -jacobian * (stress(0) + stress(1) + stress(2)) / 3.;
+  // Compute elastic modulus
+  this->compute_elastic_modulus(state_vars);
   // Set elastic tensor
   this->compute_elastic_tensor(state_vars);
   //-------------------------------------------------------------------------
   // Elastic step
   // Compute incremental stress
-  const Vector6d dstress = this->de_ * dstrain;
+  const Vector6d dstress = this->de_ * dstrain / jacobian;
   // Compute trial stress
   const Vector6d trial_stress = stress + dstress;
   // Compute trial stress invariants
-  this->compute_stress_invariants(trial_stress, state_vars);
+  this->compute_stress_invariants(trial_stress * jacobian, state_vars);
+  // Compute trial strain invariants
+  this->compute_strain_invariants(dstrain, state_vars);
   // Initialise value for yield function
   double f_function;
+  // Check yield
   auto yield_type = this->compute_yield_state(&f_function, state_vars);
   // Return the updated stress in elastic state
   if (yield_type == FailureState::Elastic) return trial_stress;
@@ -360,8 +396,6 @@ Eigen::Matrix<double, 6, 1> mpm::CamClayFiniteStrain<Tdim>::compute_stress(
   int counter_g = 0;
   // Initialise consistency parameter
   (*state_vars).at("delta_phi") = 0.;
-  // Compute trial strain invariants
-  this->compute_strain_invariants(stress, dstress, dstrain, state_vars);
   // Volumetric trial strain
   const double evstrain_trial = (*state_vars).at("evstrain");
   // Deviatoric trial strain
@@ -374,8 +408,8 @@ Eigen::Matrix<double, 6, 1> mpm::CamClayFiniteStrain<Tdim>::compute_stress(
   const double pc_n = (*state_vars).at("pc");
   // Initialise dF / dp, dF / dq, dF / dpc, dF / ddphi
   double df_dp, df_dq, df_dpc, df_ddphi;
-  // Initialise residual vector: 0 for evstrain, 1 for esstrain, 2 for yield
-  // function
+  // Initialise residual vector
+  // 0 for evstrain, 1 for esstrain, 2 for yield function
   Vector3d r_vector = Vector3d::Zero();
   // Iteration for consistency parameter
   while (fabs(f_function) > Ftolerance && counter_f < itrstep) {
@@ -402,33 +436,32 @@ Eigen::Matrix<double, 6, 1> mpm::CamClayFiniteStrain<Tdim>::compute_stress(
     (*state_vars).at("delta_phi") += delta_x(2);
     // Update pc
     (*state_vars).at("pc") =
-        pc_n * exp(-1. / (lambda_f_ - kappa_f_) *
+        pc_n * exp(-1. / (lambda_fs_ - kappa_fs_) *
                    (evstrain_trial - (*state_vars).at("evstrain")));
     // Compute omega
     (*state_vars).at("omega") =
-        -((*state_vars).at("evstrain") - evstrain0_) / kappa_f_;
+        -((*state_vars).at("evstrain") - evstrain0_) / kappa_fs_;
+    // Update elastic modulus
+    this->compute_elastic_modulus(state_vars);
     // Update volumetric stress
     (*state_vars).at("p") = p0_ * exp((*state_vars).at("omega")) *
-                            (1 + 3 * alpha_ / (2 * kappa_f_) *
+                            (1 + 3 * alpha_ / (2 * kappa_fs_) *
                                      pow((*state_vars).at("esstrain"), 2));
     // Update deviatoric stress
     (*state_vars).at("q") =
-        3 * (mu0_ - alpha_ * p0_ * exp((*state_vars).at("omega"))) *
-        (*state_vars).at("esstrain");
+        3 * (*state_vars).at("shear_modulus") * (*state_vars).at("esstrain");
     // Update yield function
     yield_type = this->compute_yield_state(&f_function, state_vars);
     // Counter iteration step
     ++counter_f;
   }
   // Set plastic tensor
-  this->compute_plastic_tensor(stress, state_vars);
+  this->compute_plastic_tensor(stress * jacobian, state_vars);
   // Compute current stress
-  Vector6d updated_stress = trial_stress - this->dp_ * dstrain;
+  Vector6d updated_stress = trial_stress - this->dp_ * dstrain / jacobian;
   // Update porosity
   (*state_vars).at("porosity") =
       (1 + e0_) * pow((pc0_ / (*state_vars).at("pc")), lambda_) - 1.;
-  // Update elastic modulus
-  this->compute_elastic_modulus(state_vars);
 
   return updated_stress;
 }

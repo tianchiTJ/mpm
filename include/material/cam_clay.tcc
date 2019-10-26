@@ -12,19 +12,27 @@ mpm::CamClay<Tdim>::CamClay(unsigned id, const Json& material_properties)
     // Poisson ratio
     poisson_ratio_ =
         material_properties["poisson_ratio"].template get<double>();
-    // Initial porosity
-    e0_ = material_properties["e0"].template get<double>();
     // Properties
     properties_ = material_properties;
     // Cam Clay parameters
-    // M
-    m_value_ = material_properties["m_value"].template get<double>();
+    // Reference mean pressure
+    p_ref_ = material_properties["p_ref"].template get<double>();
+    // Reference void ratio
+    e_ref_ = material_properties["e_ref"].template get<double>();
     // Initial preconsolidation pressure
-    p0_ = material_properties["p0"].template get<double>();
+    pc0_ = material_properties["pc0"].template get<double>();
+    // OCR
+    ocr_ = material_properties["ocr"].template get<double>();
+    // M
+    m_ = material_properties["m"].template get<double>();
     // Lambda
     lambda_ = material_properties["lambda"].template get<double>();
     // Kappa
     kappa_ = material_properties["kappa"].template get<double>();
+    // Ellipticity
+    ellipticity_ = material_properties["ellipticity"].template get<double>();
+    // Initial void ratio
+    e0_ = e_ref_ - lambda_ * log(pc0_ / p_ref_) - kappa_ * log(ocr_);
   } catch (std::exception& except) {
     console_->error("Material parameter not set: {}\n", except.what());
   }
@@ -46,12 +54,14 @@ mpm::dense_map mpm::CamClay<Tdim>::initialise_state_variables() {
       // Deviatoric stress
       {"q", 0.},
       // Lode's angle
-      // {"theta", 0.},
+      {"theta", 0.},
+      // Lode's angle multiplier
+      {"lode_multiplier", 1.},
       // Cam clay parameters
       // Preconsolidation pressure
-      {"pc", p0_},
-      // Porosity
-      {"porosity", e0_},
+      {"pc", pc0_},
+      // void_ratio
+      {"void_ratio", e0_},
       // Consistency multiplier
       {"multiplier", 0.},
       {"f_function", 0.}};
@@ -65,7 +75,7 @@ bool mpm::CamClay<Tdim>::compute_elastic_tensor(mpm::dense_map* state_vars) {
   // Bulk modulus
   if ((*state_vars).at("p") > 0) {
     (*state_vars).at("bulk_modulus") =
-        (1 + (*state_vars).at("porosity")) / kappa_ * (*state_vars).at("p");
+        (1 + (*state_vars).at("void_ratio")) / kappa_ * (*state_vars).at("p");
     // Shear modulus
     (*state_vars).at("shear_modulus") = 3 * (*state_vars).at("bulk_modulus") *
                                         (1 - 2 * poisson_ratio_) /
@@ -98,10 +108,10 @@ bool mpm::CamClay<Tdim>::compute_plastic_tensor(const Vector6d& stress,
   // Compute dF / dp
   const double df_dp = 2 * p - pc;
   // Compute dF / dq
-  const double df_dq = 2 * q / (m_value_ * m_value_);
+  const double df_dq = 2 * q / (m_ * m_);
   // Upsilon
   const double upsilon =
-      (1 + (*state_vars).at("porosity")) / (lambda_ - kappa_);
+      (1 + (*state_vars).at("void_ratio")) / (lambda_ - kappa_);
   // chi
   const double chi = (*state_vars).at("bulk_modulus") * (df_dp * df_dp) +
                      3 * (*state_vars).at("shear_modulus") * (df_dq * df_dq) +
@@ -176,7 +186,45 @@ bool mpm::CamClay<Tdim>::compute_stress_invariants(const Vector6d& stress,
   if (Tdim == 3) j2 += pow(stress(4), 2) + pow(stress(5), 2);
   // Compute q
   (*state_vars)["q"] = sqrt(3 * j2);
+  // Compute J3
+  double j3 = (dev_stress(0) * dev_stress(1) * dev_stress(2)) -
+              (dev_stress(2) * pow(dev_stress(3), 2));
+  if (Tdim == 3)
+    j3 += ((2 * dev_stress(3) * dev_stress(4) * dev_stress(5)) -
+           (dev_stress(0) * pow(dev_stress(4), 2)) -
+           (dev_stress(1) * pow(dev_stress(5), 2)));
+  // Compute theta value (Lode angle)
+  double theta_val = 0.;
+  if (fabs(j2) > 0.0) theta_val = (3. * sqrt(3.) / 2.) * (j3 / pow(j2, 1.5));
+  // Check theta value
+  if (theta_val > 1.0) theta_val = 1.0;
+  if (theta_val < -1.0) theta_val = -1.0;
+  // Compute theta
+  (*state_vars).at("theta") = (1. / 3.) * acos(theta_val);
+  // Check theta
+  if ((*state_vars).at("theta") > M_PI / 3.)
+    (*state_vars).at("theta") = M_PI / 3.;
+  if ((*state_vars).at("theta") < 0.0) (*state_vars).at("theta") = 0.;
 
+  return true;
+}
+
+//! Compute lode angle effect
+template <unsigned Tdim>
+bool mpm::CamClay<Tdim>::compute_lode_multiplier(mpm::dense_map* state_vars) {
+  // Get stress invariants
+  const double theta = (*state_vars).at("theta");
+  (*state_vars).at("lode_multiplier") = 1.;
+  double num = 4 * (1 - pow(ellipticity_, 2)) * pow(cos(theta), 2);
+  double root = num + 5 * pow(ellipticity_, 2) - 4 * ellipticity_;
+  if (root > 0) {
+    double den = 2 * (1 - pow(ellipticity_, 2)) * cos(theta) +
+                 (2 * ellipticity_ - 1) * sqrt(root);
+    if (fabs(den) > 1.E-10) {
+      num += pow((2 * ellipticity_ - 1), 2);
+      (*state_vars).at("lode_multiplier") = num / den;
+    }
+  }
   return true;
 }
 
@@ -188,12 +236,15 @@ typename mpm::CamClay<Tdim>::FailureState
   // Get stress invariants
   const double p = (*state_vars).at("p");
   const double q = (*state_vars).at("q");
+  const double theta = (*state_vars).at("theta");
+  const double lode_multiplier = (*state_vars).at("lode_multiplier");
   // Plastic volumetic strain
   const double pc = (*state_vars).at("pc");
   // Initialise yield status (0: elastic, 1: yield)
   auto yield_type = FailureState::Elastic;
   // Compute yield functions
-  (*yield_function) = q * q / (m_value_ * m_value_) + p * (p - pc);
+  (*yield_function) =
+      q * q * lode_multiplier * lode_multiplier / (m_ * m_) + p * (p - pc);
   // Tension failure
   if ((*yield_function) > 1.E-22) yield_type = FailureState::Yield;
 
@@ -209,27 +260,28 @@ void mpm::CamClay<Tdim>::compute_df_dmul(const mpm::dense_map* state_vars,
   const double q = (*state_vars).at("q");
   // Preconsolidation pressure
   const double pc = (*state_vars).at("pc");
+  // Lode angle multiplier
+  const double lode_multiplier = (*state_vars).at("lode_multiplier");
   // Compute dF / dp
   double df_dp = 2 * p - pc;
   // Compute dF / dq
-  double df_dq = 2 * q / (m_value_ * m_value_);
+  double df_dq = 2 * q / (m_ * m_) * lode_multiplier * lode_multiplier;
   // Compute dF / dpc
   double df_dpc = -p;
   // Upsilon
-  double upsilon = (1 + (*state_vars).at("porosity")) / (lambda_ - kappa_);
+  double upsilon = (1 + (*state_vars).at("void_ratio")) / (lambda_ - kappa_);
   // A_den
   double a_den = 1 + (2 * (*state_vars).at("bulk_modulus") + upsilon * pc) *
                          (*state_vars).at("multiplier");
   // Compute dp / dmultiplier
-  double dp_dmul =
-      -(*state_vars).at("bulk_modulus") * (2 * p - pc) / (a_den + 1.E-10);
+  double dp_dmul = -(*state_vars).at("bulk_modulus") * (2 * p - pc) / a_den;
   // Compute dpc / dmultiplier
-  double dpc_dmul = upsilon * pc * (2 * p - pc) / (a_den + 1.E-10);
+  double dpc_dmul = upsilon * pc * (2 * p - pc) / a_den;
   // Compute dq / dmultiplier
-  double dq_dmul =
-      -q /
-      ((*state_vars).at("multiplier") +
-       m_value_ * m_value_ / (6 * (*state_vars).at("shear_modulus")) + 1.E-10);
+  double dq_dmul = -q / ((*state_vars).at("multiplier") +
+                         m_ * m_ /
+                             (6 * (*state_vars).at("shear_modulus") *
+                              lode_multiplier * lode_multiplier));
   // Compute dF / dmultiplier
   (*df_dmul) = (df_dp * dp_dmul) + (df_dq * dq_dmul) + (df_dpc * dpc_dmul);
 }
@@ -241,23 +293,19 @@ void mpm::CamClay<Tdim>::compute_dg_dpc(const mpm::dense_map* state_vars,
                                         double* g_function, double* dg_dpc) {
   // Upsilon
   const double upsilon =
-      (1 + (*state_vars).at("porosity")) / (lambda_ - kappa_);
+      (1 + (*state_vars).at("void_ratio")) / (lambda_ - kappa_);
   // Exponential index
-  double e_index =
-      upsilon * (*state_vars).at("multiplier") *
-      (2 * p_trial - (*state_vars).at("pc")) /
-      (1 +
-       2 * (*state_vars).at("multiplier") * (*state_vars).at("bulk_modulus") +
-       1.E-10);
+  double e_index = upsilon * (*state_vars).at("multiplier") *
+                   (2 * p_trial - (*state_vars).at("pc")) /
+                   (1 + 2 * (*state_vars).at("multiplier") *
+                            (*state_vars).at("bulk_modulus"));
   // Compute consistency multiplier function
   (*g_function) = pc_n * exp(e_index) - (*state_vars).at("pc");
   // Compute dG / dpc
   (*dg_dpc) = pc_n * exp(e_index) *
                   (-upsilon * (*state_vars).at("multiplier") /
-                   (1 +
-                    2 * (*state_vars).at("multiplier") *
-                        (*state_vars).at("bulk_modulus") +
-                    1.E-10)) -
+                   (1 + 2 * (*state_vars).at("multiplier") *
+                            (*state_vars).at("bulk_modulus"))) -
               1;
 }
 
@@ -267,9 +315,9 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
     const Vector6d& stress, const Vector6d& dstrain,
     const ParticleBase<Tdim>* ptr, mpm::dense_map* state_vars) {
   // Tolerance for yield function
-  const double Ftolerance = 1.E-1;
+  const double Ftolerance = 1.E-5;
   // Tolerance for preconsolidation function
-  const double Gtolerance = 1.E-1;
+  const double Gtolerance = 1.E-5;
   // Maximum iteration step number
   const int itrstep = 100;
   // Maximum subiteration step number
@@ -284,6 +332,8 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
   Vector6d trial_stress = stress + (this->de_ * dstrain);
   // Compute trial stress invariants
   this->compute_stress_invariants(trial_stress, state_vars);
+  // Compute lode multiplier
+  if (ellipticity_ != 1) this->compute_lode_multiplier(state_vars);
   // Initialise value for yield function
   double f_function;
   auto yield_type = this->compute_yield_state(&f_function, state_vars);
@@ -319,7 +369,6 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
     // Subiteraction for preconsolidation pressure
     while (fabs(g_function) > Gtolerance && counter_g < substep) {
       // Update preconsolidation pressure
-      // if (fabs(dg_dpc) > 1.E-5)
       (*state_vars).at("pc") -= g_function / dg_dpc;
       // Update G and dG / dpc
       this->compute_dg_dpc(state_vars, pc_n, p_trial, &g_function, &dg_dpc);
@@ -327,24 +376,38 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
       ++counter_g;
     }
     // Update volumetric stress
-    (*state_vars).at("p") =
-        (p_trial + (*state_vars).at("bulk_modulus") *
-                       (*state_vars).at("multiplier") *
-                       (*state_vars).at("pc")) /
-        (1 +
-         2 * (*state_vars).at("bulk_modulus") * (*state_vars).at("multiplier") +
-         1.E-10);
+    (*state_vars).at("p") = (p_trial + (*state_vars).at("bulk_modulus") *
+                                           (*state_vars).at("multiplier") *
+                                           (*state_vars).at("pc")) /
+                            (1 + 2 * (*state_vars).at("bulk_modulus") *
+                                     (*state_vars).at("multiplier"));
     // Update deviatoric stress
     (*state_vars).at("q") =
-        q_trial / (1 +
-                   6 * (*state_vars).at("shear_modulus") *
-                       (*state_vars).at("multiplier") / (m_value_ * m_value_) +
-                   1.E-10);
+        q_trial / (1 + 6 * (*state_vars).at("shear_modulus") *
+                           (*state_vars).at("multiplier") *
+                           (*state_vars).at("lode_multiplier") *
+                           (*state_vars).at("lode_multiplier") / (m_ * m_));
 
     // Update yield function
     yield_type = this->compute_yield_state(&f_function, state_vars);
     // Counter iteration step
     ++counter_f;
+    // Update lode angle
+    if (ellipticity_ != 1) {
+      // Set plastic tensor
+      this->compute_plastic_tensor(stress, state_vars);
+      // Modified dstrain
+      Vector6d dstrain_m = dstrain;
+      dstrain_m(3) *= 0.5;
+      dstrain_m(4) *= 0.5;
+      dstrain_m(5) *= 0.5;
+      // Compte current stress
+      Vector6d updated_stress = trial_stress - this->dp_ * dstrain_m;
+      // Compute stress invariants
+      this->compute_stress_invariants(updated_stress, state_vars);
+      // Compute lode multiplier
+      this->compute_lode_multiplier(state_vars);
+    }
   }
 
   // Set plastic tensor
@@ -360,8 +423,8 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
   Vector6d updated_stress = trial_stress - this->dp_ * dstrain_m;
   // Incremental Volumetric strain
   double dvstrain = dstrain(0) + dstrain(1) + dstrain(2);
-  // Update porosity
-  (*state_vars).at("porosity") += dvstrain * (1 + e0_);
+  // Update void_ratio
+  (*state_vars).at("void_ratio") += dvstrain * (1 + e0_);
 
   return updated_stress;
 }

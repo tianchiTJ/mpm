@@ -86,6 +86,15 @@ class CamClay : public Material<Tdim> {
   void compute_dg_dpc(const mpm::dense_map* state_vars, const double pc_n,
                       const double p_trial, double* g_function, double* dg_dpc);
 
+  //! Compute lode angle effect
+  bool compute_lode_multiplier(mpm::dense_map* state_vars);
+
+  //! Compute elastic tensor
+  bool compute_elastic_tensor(mpm::dense_map* state_vars);
+  //! Compute plastic tensor
+  bool compute_plastic_tensor(const Vector6d& stress,
+                              mpm::dense_map* state_vars);
+
  protected:
   //! material id
   using Material<Tdim>::id_;
@@ -95,11 +104,6 @@ class CamClay : public Material<Tdim> {
   using Material<Tdim>::console_;
 
  private:
-  //! Compute elastic tensor
-  bool compute_elastic_tensor(mpm::dense_map* state_vars);
-  //! Compute plastic tensor
-  bool compute_plastic_tensor(const Vector6d& stress,
-                              mpm::dense_map* state_vars);
   //! Elastic stiffness matrix
   Matrix6x6 de_;
   //! Plastic stiffness matrix
@@ -111,17 +115,25 @@ class CamClay : public Material<Tdim> {
   double youngs_modulus_{std::numeric_limits<double>::max()};
   //! Poisson ratio
   double poisson_ratio_{std::numeric_limits<double>::max()};
-  //! Initial porosity
+  //! Initial void_ratio
   double e0_{std::numeric_limits<double>::max()};
   // Cam Clay parameters
-  //! M
-  double m_value_{std::numeric_limits<double>::max()};
+  // Reference mean pressure
+  double p_ref_{std::numeric_limits<double>::max()};
+  // Reference void ratio
+  double e_ref_{std::numeric_limits<double>::max()};
   //! Initial preconsolidation pressure
-  double p0_{std::numeric_limits<double>::max()};
+  double pc0_{std::numeric_limits<double>::max()};
+  // OCR
+  double ocr_{std::numeric_limits<double>::max()};
+  //! M
+  double m_{std::numeric_limits<double>::max()};
   //! Lambda
   double lambda_{std::numeric_limits<double>::max()};
   //! Kappa
   double kappa_{std::numeric_limits<double>::max()};
+  //! Ellipticity
+  double ellipticity_{std::numeric_limits<double>::max()};
 
 };  // CamClay class
 }  // namespace mpm
