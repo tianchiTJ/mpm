@@ -59,23 +59,37 @@ class CamClay : public Material<Tdim> {
                           const ParticleBase<Tdim>* ptr,
                           mpm::dense_map* state_vars) override;
 
-  //! Compute stress invariants (j2, j3, rho, theta, and epsilon)
+  //! Compute stress invariants (j3, q, theta, and epsilon)
   //! \param[in] stress Stress
+  //! \param[in] direction of deviatoric stress
   //! \param[in] state_vars History-dependent state variables
   //! \retval status of computation of stress invariants
-  bool compute_stress_invariants(const Vector6d& stress,
+  bool compute_stress_invariants(const Vector6d& stress,Vector6d& n,
                                  mpm::dense_map* state_vars);
 
   //! Compute yield function and yield state
   //! \param[in] state_vars History-dependent state variables
-  //! \retval yield_type Yield type (elastic, shear or tensile)
-  FailureState compute_yield_state(double* yield_function,
-                                   const mpm::dense_map* state_vars);
+  //! \retval yield_type Yield type (elastic or yield)
+  FailureState compute_yield_state(mpm::dense_map* state_vars);
+
+  //! Compute bonding parameters
+  //! \param[in] chi Degredation
+  //! \param[in] state_vars History-dependent state variables
+  void compute_bonding_parameters(const double* chi,
+                                  mpm::dense_map* state_vars);
 
   //! Compute dF/dmul
   //! \param[in] state_vars History-dependent state variables
-  //! \param[in] df_dmul dF / dmultiplier
+  //! \param[in] df_dmul dF / ddelta_phi
   void compute_df_dmul(const mpm::dense_map* state_vars, double* df_dmul);
+
+  //! Compute dF/dSigma
+  //! \param[in] state_vars History-dependent state variables
+  //! \param[in] stress Stress
+  //! \param[in] df_dsigma dF/dSigma
+  void compute_df_dsigma(const mpm::dense_map* state_vars,
+                         const Vector6d& stress,
+                         Vector6d* df_dsigma);
 
   //! Compute G and dG/dpc
   //! \param[in] state_vars History-dependent state variables
@@ -86,12 +100,15 @@ class CamClay : public Material<Tdim> {
   void compute_dg_dpc(const mpm::dense_map* state_vars, const double pc_n,
                       const double p_trial, double* g_function, double* dg_dpc);
 
-  //! Compute lode angle effect
-  bool compute_lode_multiplier(mpm::dense_map* state_vars);
-
   //! Compute elastic tensor
+  //! \param[in] state_vars History-dependent state variables
+  //! \retval status of computation
   bool compute_elastic_tensor(mpm::dense_map* state_vars);
+
   //! Compute plastic tensor
+  //! \param[in] stress Stress
+  //! \param[in] state_vars History-dependent state variables
+  //! \retval status of computation
   bool compute_plastic_tensor(const Vector6d& stress,
                               mpm::dense_map* state_vars);
 
@@ -108,7 +125,7 @@ class CamClay : public Material<Tdim> {
   Matrix6x6 de_;
   //! Plastic stiffness matrix
   Matrix6x6 dp_;
-  // General parameters
+  //! General parameters
   //! Density
   double density_{std::numeric_limits<double>::max()};
   //! Youngs modulus
@@ -117,24 +134,38 @@ class CamClay : public Material<Tdim> {
   double poisson_ratio_{std::numeric_limits<double>::max()};
   //! Initial void_ratio
   double e0_{std::numeric_limits<double>::max()};
-  // Cam Clay parameters
-  // Reference mean pressure
+  //! Cam Clay parameters
+  //! Reference mean pressure
   double p_ref_{std::numeric_limits<double>::max()};
-  // Reference void ratio
+  //! Reference void ratio
   double e_ref_{std::numeric_limits<double>::max()};
   //! Initial preconsolidation pressure
   double pc0_{std::numeric_limits<double>::max()};
-  // OCR
+  //! OCR
   double ocr_{std::numeric_limits<double>::max()};
-  //! M
+  //! M (or Mtc in "Three invariants type")
   double m_{std::numeric_limits<double>::max()};
   //! Lambda
   double lambda_{std::numeric_limits<double>::max()};
   //! Kappa
   double kappa_{std::numeric_limits<double>::max()};
-  //! Ellipticity
-  double ellipticity_{std::numeric_limits<double>::max()};
-
+  //! Three invariants
+  bool three_invariants_{false};
+  //! Bonding properties
+  //! Bonding status
+  bool bonding_{false};
+  //! Material constants a
+  double mc_a_{std::numeric_limits<double>::max()};
+  //! Material constants b
+  double mc_b_{std::numeric_limits<double>::max()};
+  //! Material constants c
+  double mc_c_{std::numeric_limits<double>::max()};
+  //! Material constants d
+  double mc_d_{std::numeric_limits<double>::max()};
+  //! Degradation
+  double degradation_{std::numeric_limits<double>::max()};
+  //! Hydrate saturation
+  double s_h_{std::numeric_limits<double>::max()};
 };  // CamClay class
 }  // namespace mpm
 

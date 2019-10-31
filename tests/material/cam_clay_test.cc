@@ -36,7 +36,8 @@ TEST_CASE("Undrained condition is checked in 3D", "[material][cam_clay][3D]") {
   jmaterial["m"] = 1.2;
   jmaterial["lambda"] = 0.4;
   jmaterial["kappa"] = 0.05;
-  jmaterial["ellipticity"] = 1.;
+  jmaterial["three_invariants"] = false;
+  jmaterial["bonding"] = false;
 
   SECTION("CamClay check stresses") {
     unsigned id = 0;
@@ -84,8 +85,9 @@ TEST_CASE("Undrained condition is checked in 3D", "[material][cam_clay][3D]") {
 
     // Define the steps
     const int iter = 100;
-    std::ofstream fStress;
-    fStress.open("cam_clay_undrained.txt");
+    std::ofstream fStress, fVoid;
+    fStress.open("mcc_undrained_p_q.txt");
+    fVoid.open("mcc_undrained_void_ratio.txt");
     // Compute updated stress
     for (int i = 0; i < iter; i++) {
       // Compute stress
@@ -94,9 +96,10 @@ TEST_CASE("Undrained condition is checked in 3D", "[material][cam_clay][3D]") {
 
       //! Initialise writing of inputfiles
       fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
+      fVoid << state_vars.at("void_ratio") << "\n";
     }
     fStress.close();
-
+    fVoid.close();
     // Check stressees
     // REQUIRE(stress(0) == Approx(-200000).epsilon(Tolerance));
     // REQUIRE(stress(1) == Approx(-200000).epsilon(Tolerance));
@@ -132,7 +135,8 @@ TEST_CASE("Drained condition is checked in 3D", "[material][cam_clay][3D]") {
   jmaterial["m"] = 1.2;
   jmaterial["lambda"] = 0.4;
   jmaterial["kappa"] = 0.05;
-  jmaterial["ellipticity"] = 1.;
+  jmaterial["three_invariants"] = false;
+  jmaterial["bonding"] = false;
 
   SECTION("CamClay check stresses") {
     unsigned id = 0;
@@ -171,33 +175,28 @@ TEST_CASE("Drained condition is checked in 3D", "[material][cam_clay][3D]") {
     // Initialise strain
     mpm::Material<Dim>::Vector6d dstrain;
     dstrain.setZero();
-    dstrain(0) = 0.00015686;
-    dstrain(1) = 0.00015686;
-    dstrain(2) = -0.00084314;
-    dstrain(3) = 0.0000000;
-    dstrain(4) = 0.0000000;
-    dstrain(5) = 0.0000000;
+    dstrain(2) = -0.0001;
 
     // Define the steps
     const int iter = 100;
-    std::ofstream fStress;
-    fStress.open("cam_clay_drained.txt");
+    std::ofstream fStress, fVoid;
+    fStress.open("mcc_drained_p_q.txt");
+    fVoid.open("mcc_drained_void_ratio.txt");
     // Compute updated stress
     for (int i = 0; i < iter; i++) {
+      double G = state_vars.at("shear_modulus");
+      double a1 = state_vars.at("bulk_modulus") + (4.0 / 3.0) * G;
+      double a2 = state_vars.at("bulk_modulus") - (2.0 / 3.0) * G;
+      dstrain(0) = a2 * dstrain(2) / (-a1 - a2);
+      dstrain(1) = a2 * dstrain(2) / (-a1 - a2);
       // Compute stress
       stress = cam_clay->compute_stress(stress, dstrain, particle.get(),
                                         &state_vars);
       //! Initialise writing of inputfiles
       fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
+      fVoid << state_vars.at("void_ratio") << "\n";
     }
     fStress.close();
-
-    // Check stressees
-    // REQUIRE(stress(0) == Approx(-200000).epsilon(Tolerance));
-    // REQUIRE(stress(1) == Approx(-200000).epsilon(Tolerance));
-    // REQUIRE(stress(2) == Approx(-200000).epsilon(Tolerance));
-    // REQUIRE(stress(3) == Approx(0.000000e+00).epsilon(Tolerance));
-    // REQUIRE(stress(4) == Approx(0.000000e+00).epsilon(Tolerance));
-    // REQUIRE(stress(5) == Approx(0.000000e+00).epsilon(Tolerance));
+    fVoid.close();
   }
 }
