@@ -90,8 +90,7 @@ class CamClayFiniteStrain : public Material<Tdim> {
   //! \param[in] dstrain Strain
   //! \param[in] state_vars History-dependent state variables
   //! \retval status of computation of strain invariants
-  bool compute_strain_invariants(const Vector6d& dstress,
-                                 const Vector6d& dstrain,
+  bool compute_strain_invariants(const Vector6d& dstrain,
                                  mpm::dense_map* state_vars);
 
   //! Compute stress invariants (j2, j3, rho, theta, and epsilon)

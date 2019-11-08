@@ -1,5 +1,6 @@
 #include <fstream>
 #include <limits>
+#include <vector>
 
 #include "Eigen/Dense"
 #include "catch.hpp"
@@ -87,11 +88,17 @@ TEST_CASE("Undrained condition hardening is checked in 3D",
 
     // Define the steps
     const int iter = 100;
-    std::ofstream fStress, fVoid;
+    std::ofstream fPc, fStrain, fStress, fVoid;
+    fPc.open("mcc_undrained_hardening_pc.txt");
+    fStrain.open("mcc_undrained_hardening_strain.txt");
     fStress.open("mcc_undrained_hardening_p_q.txt");
     fVoid.open("mcc_undrained_hardening_void_ratio.txt");
     // Compute updated stress
     for (int i = 0; i < iter; i++) {
+      fPc << state_vars.at("pc") << "\n";
+      fStrain << dstrain(0) << "\t" << dstrain(2) << "\t"
+              << state_vars.at("dpvstrain") << "\t"
+              << state_vars.at("dpdstrain") << "\n";
       // Compute stress
       stress = cam_clay->compute_stress(stress, dstrain, particle.get(),
                                         &state_vars);
@@ -100,15 +107,10 @@ TEST_CASE("Undrained condition hardening is checked in 3D",
       fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
       fVoid << state_vars.at("void_ratio") << "\n";
     }
+    fPc.close();
+    fStrain.close();
     fStress.close();
     fVoid.close();
-    // Check stressees
-    // REQUIRE(stress(0) == Approx(-200000).epsilon(Tolerance));
-    // REQUIRE(stress(1) == Approx(-200000).epsilon(Tolerance));
-    // REQUIRE(stress(2) == Approx(-200000).epsilon(Tolerance));
-    // REQUIRE(stress(3) == Approx(0.000000e+00).epsilon(Tolerance));
-    // REQUIRE(stress(4) == Approx(0.000000e+00).epsilon(Tolerance));
-    // REQUIRE(stress(5) == Approx(0.000000e+00).epsilon(Tolerance));
   }
 }
 
@@ -169,13 +171,6 @@ TEST_CASE("Undrained condition softening is checked in 3D",
     mpm::Material<Dim>::Vector6d n;
     cam_clay->compute_stress_invariants(stress, n, &state_vars);
 
-    // Compute elastic modulus
-    // cam_clay->compute_elastic_tensor(&state_vars);
-    // REQUIRE(state_vars.at("bulk_modulus") ==
-    //        Approx(7370964.511104).epsilon(Tolerance));
-    // REQUIRE(state_vars.at("shear_modulus") ==
-    //        Approx(3902275.329408).epsilon(Tolerance));
-
     // Initialise strain
     mpm::Material<Dim>::Vector6d dstrain;
     dstrain.setZero();
@@ -188,11 +183,17 @@ TEST_CASE("Undrained condition softening is checked in 3D",
 
     // Define the steps
     const int iter = 200;
-    std::ofstream fStress, fVoid;
+    std::ofstream fPc, fStrain, fStress, fVoid;
+    fPc.open("mcc_undrained_softening_pc.txt");
+    fStrain.open("mcc_undrained_softening_strain.txt");
     fStress.open("mcc_undrained_softening_p_q.txt");
     fVoid.open("mcc_undrained_softening_void_ratio.txt");
     // Compute updated stress
     for (int i = 0; i < iter; i++) {
+      fPc << state_vars.at("pc") << "\n";
+      fStrain << dstrain(0) << "\t" << dstrain(2) << "\t"
+              << state_vars.at("dpvstrain") << "\t"
+              << state_vars.at("dpdstrain") << "\n";
       // Compute stress
       stress = cam_clay->compute_stress(stress, dstrain, particle.get(),
                                         &state_vars);
@@ -201,15 +202,10 @@ TEST_CASE("Undrained condition softening is checked in 3D",
       fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
       fVoid << state_vars.at("void_ratio") << "\n";
     }
+    fPc.close();
+    fStrain.close();
     fStress.close();
     fVoid.close();
-    // Check stressees
-    // REQUIRE(stress(0) == Approx(-200000).epsilon(Tolerance));
-    // REQUIRE(stress(1) == Approx(-200000).epsilon(Tolerance));
-    // REQUIRE(stress(2) == Approx(-200000).epsilon(Tolerance));
-    // REQUIRE(stress(3) == Approx(0.000000e+00).epsilon(Tolerance));
-    // REQUIRE(stress(4) == Approx(0.000000e+00).epsilon(Tolerance));
-    // REQUIRE(stress(5) == Approx(0.000000e+00).epsilon(Tolerance));
   }
 }
 
@@ -234,13 +230,328 @@ TEST_CASE("drained condition hardening is checked in 3D",
   jmaterial["poisson_ratio"] = 0.275;
   jmaterial["p_ref"] = 100000;
   jmaterial["e_ref"] = 1.12;
-  jmaterial["pc0"] = 300000;
+  jmaterial["pc0"] = 200000;
   jmaterial["ocr"] = 1.;
   jmaterial["m"] = 1.2;
   jmaterial["lambda"] = 0.4;
   jmaterial["kappa"] = 0.05;
   jmaterial["three_invariants"] = false;
   jmaterial["bonding"] = false;
+
+  unsigned id = 0;
+  auto material =
+      Factory<mpm::Material<Dim>, unsigned, const Json&>::instance()->create(
+          "CamClay3D", std::move(id), jmaterial);
+
+  auto cam_clay = std::make_shared<mpm::CamClay<Dim>>(id, jmaterial);
+
+  // Number of steps
+  const unsigned long long nsteps = 100000;
+  // Interval of output step;
+  const unsigned output_steps = 1000;
+  // Initialise dstrain
+  std::vector<double> dstrainv;
+  std::vector<double> dstrainh;
+
+  // Initialise dstrain
+  const double dstrainq = 1.E-5;
+  double dstrainp = 0;
+  // Initialise stress invariances
+  double p = material->property("pc0") / material->property("ocr");
+  double q = 0;
+  // Compute e0
+  const double e0 =
+      material->property("e_ref") -
+      material->property("lambda") *
+          log(material->property("pc0") / material->property("p_ref")) -
+      material->property("kappa") * log(material->property("ocr"));
+  // Initialise e
+  double e = e0;
+  // Initialise pc
+  double pc = material->property("pc0");
+
+  for (int i = 0; i < nsteps; ++i) {
+    double yield_function =
+        q * q + pow(material->property("m"), 2) * p * (p - pc);
+    // Initialise modulus
+    double e_b = (1 + e) / material->property("kappa") * p;
+    double e_s = 1.5 * (1 - 2 * material->property("poisson_ratio")) /
+                 (1 + material->property("poisson_ratio")) * e_b;
+    if (yield_function < 0) {
+      // Compute dp, dq
+      const double dq = 3 * e_s * dstrainq;
+      const double dp = dq / 3;
+      // Update dstrain
+      dstrainp = dp / e_b;
+      dstrainv.push_back(dstrainq + dstrainp / 3);
+      dstrainh.push_back((dstrainp * 2 / 3 - dstrainq) / 2);
+      // Update p, q
+      p += dp;
+      q += dq;
+    } else {
+      // Compute derivatives
+      const double eta = q / p;
+      const double df_dq = 2 * q;
+      const double df_dp = p * (pow(material->property("m"), 2) - pow(eta, 2));
+      const double hardening =
+          pow(p, 2) * (pow(material->property("m"), 4) - pow(eta, 4)) *
+          material->property("kappa") /
+          (material->property("lambda") - material->property("kappa")) * e_b;
+      const double delta_phi =
+          (e_b * df_dp * dstrainp + 3 * e_s * df_dq * dstrainq) /
+          (hardening + e_b * df_dp * df_dp + 3 * e_s * df_dq * df_dq);
+      // Compute dp, dq
+      const double dq = 3 * e_s * (dstrainq - delta_phi * df_dq);
+      const double dp = dq / 3;
+      // Update dstrain
+      dstrainp = dp / e_b + delta_phi * df_dp;
+      dstrainv.push_back(dstrainq + dstrainp / 3);
+      dstrainh.push_back((dstrainp * 2 / 3 - dstrainq) / 2);
+      // Update p, q
+      p += dp;
+      q += dq;
+      // Update e
+      e += -dstrainp * (1 + e0);
+      // Update pc
+      pc *= exp((1 + e) /
+                (material->property("lambda") - material->property("kappa")) *
+                delta_phi * (2 * p - pc));
+    }
+  }
+
+  // Initialise stress
+  mpm::Material<Dim>::Vector6d stress;
+  stress.setZero();
+  stress(0) = -material->property("p_ref") / material->property("ocr");
+  stress(1) = -material->property("p_ref") / material->property("ocr");
+  stress(2) = -material->property("p_ref") / material->property("ocr");
+
+  // Compute stress invariants
+  mpm::dense_map state_vars = material->initialise_state_variables();
+  mpm::Material<Dim>::Vector6d n;
+  cam_clay->compute_stress_invariants(stress, n, &state_vars);
+
+  mpm::Material<Dim>::Vector6d dstrain;
+  dstrain.setZero();
+
+  // Define the steps
+  std::ofstream fPc, fStrain, fStress, fVoid;
+  fPc.open("mcc_drained_hardening_pc.txt");
+  fStrain.open("mcc_drained_hardening_strain.txt");
+  fStress.open("mcc_drained_hardening_p_q.txt");
+  fVoid.open("mcc_drained_hardening_void_ratio.txt");
+  // Compute updated stress
+  for (int i = 0; i < nsteps; i++) {
+    // Get dstrain
+    dstrain(0) = dstrain(1) = -dstrainh[i];
+    dstrain(2) = -dstrainv[i];
+    // Compute stress
+    stress =
+        cam_clay->compute_stress(stress, dstrain, particle.get(), &state_vars);
+
+    //! Initialise writing of inputfiles
+    if (i % output_steps == 0) {
+      fPc << state_vars.at("pc") << "\n";
+      fStrain << dstrain(0) << "\t" << dstrain(2) << "\t"
+              << state_vars.at("dpvstrain") << "\t"
+              << state_vars.at("dpdstrain") << "\n";
+      fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
+      fVoid << state_vars.at("void_ratio") << "\n";
+    }
+  }
+  fStress.close();
+  fVoid.close();
+}
+
+//! Check drained condition for softening in 3D
+TEST_CASE("drained condition softening is checked in 3D",
+          "[material][cam_clay][3D]") {
+  // Tolerance
+  const double Tolerance = 1.E-7;
+
+  const unsigned Dim = 3;
+
+  // Add particle
+  mpm::Index pid = 0;
+  Eigen::Matrix<double, Dim, 1> coords;
+  coords.setZero();
+  auto particle = std::make_shared<mpm::Particle<Dim, 1>>(pid, coords);
+
+  // Initialise material
+  Json jmaterial;
+  jmaterial["density"] = 1000.;
+  jmaterial["youngs_modulus"] = 1.0E+7;
+  jmaterial["poisson_ratio"] = 0.275;
+  jmaterial["p_ref"] = 100000;
+  jmaterial["e_ref"] = 1.12;
+  jmaterial["pc0"] = 200000;
+  jmaterial["ocr"] = 4.;
+  jmaterial["m"] = 1.2;
+  jmaterial["lambda"] = 0.4;
+  jmaterial["kappa"] = 0.05;
+  jmaterial["three_invariants"] = false;
+  jmaterial["bonding"] = false;
+
+  unsigned id = 0;
+  auto material =
+      Factory<mpm::Material<Dim>, unsigned, const Json&>::instance()->create(
+          "CamClay3D", std::move(id), jmaterial);
+
+  auto cam_clay = std::make_shared<mpm::CamClay<Dim>>(id, jmaterial);
+
+  // Number of steps
+  const unsigned long long nsteps = 100000;
+  // Interval of output step;
+  const unsigned output_steps = 1000;
+  // Initialise dstrain
+  std::vector<double> dstrainv;
+  std::vector<double> dstrainh;
+
+  // Initialise dstrain
+  const double dstrainq = 1.E-5;
+  double dstrainp = 0;
+  // Initialise stress invariances
+  double p = material->property("pc0") / material->property("ocr");
+  double q = 0;
+  // Compute e0
+  const double e0 =
+      material->property("e_ref") -
+      material->property("lambda") *
+          log(material->property("pc0") / material->property("p_ref")) -
+      material->property("kappa") * log(material->property("ocr"));
+  // Initialise e
+  double e = e0;
+  // Initialise pc
+  double pc = material->property("pc0");
+
+  for (int i = 0; i < nsteps; ++i) {
+    double yield_function =
+        q * q + pow(material->property("m"), 2) * p * (p - pc);
+    // Initialise modulus
+    double e_b = (1 + e) / material->property("kappa") * p;
+    double e_s = 1.5 * (1 - 2 * material->property("poisson_ratio")) /
+                 (1 + material->property("poisson_ratio")) * e_b;
+    if (yield_function < 0) {
+      // Compute dp, dq
+      const double dq = 3 * e_s * dstrainq;
+      const double dp = dq / 3;
+      // Update dstrain
+      dstrainp = dp / e_b;
+      dstrainv.push_back(dstrainq + dstrainp / 3);
+      dstrainh.push_back((dstrainp * 2 / 3 - dstrainq) / 2);
+      // Update p, q
+      p += dp;
+      q += dq;
+    } else {
+      // Compute derivatives
+      const double eta = q / p;
+      const double df_dq = 2 * q;
+      const double df_dp = p * (pow(material->property("m"), 2) - pow(eta, 2));
+      const double hardening =
+          pow(p, 2) * (pow(material->property("m"), 4) - pow(eta, 4)) *
+          material->property("kappa") /
+          (material->property("lambda") - material->property("kappa")) * e_b;
+      const double delta_phi =
+          (e_b * df_dp * dstrainp + 3 * e_s * df_dq * dstrainq) /
+          (hardening + e_b * df_dp * df_dp + 3 * e_s * df_dq * df_dq);
+      // Compute dp, dq
+      const double dq = 3 * e_s * (dstrainq - delta_phi * df_dq);
+      const double dp = dq / 3;
+      // Update dstrain
+      dstrainp = dp / e_b + delta_phi * df_dp;
+      dstrainv.push_back(dstrainq + dstrainp / 3);
+      dstrainh.push_back((dstrainp * 2 / 3 - dstrainq) / 2);
+      // Update p, q
+      p += dp;
+      q += dq;
+      // Update e
+      e += -dstrainp * (1 + e0);
+      // Update pc
+      pc *= exp((1 + e) /
+                (material->property("lambda") - material->property("kappa")) *
+                delta_phi * (2 * p - pc));
+    }
+  }
+
+  // Initialise stress
+  mpm::Material<Dim>::Vector6d stress;
+  stress.setZero();
+  stress(0) = -material->property("p_ref") / material->property("ocr");
+  stress(1) = -material->property("p_ref") / material->property("ocr");
+  stress(2) = -material->property("p_ref") / material->property("ocr");
+
+  // Compute stress invariants
+  mpm::dense_map state_vars = material->initialise_state_variables();
+  mpm::Material<Dim>::Vector6d n;
+  cam_clay->compute_stress_invariants(stress, n, &state_vars);
+
+  mpm::Material<Dim>::Vector6d dstrain;
+  dstrain.setZero();
+
+  // Define the steps
+  std::ofstream fPc, fStrain, fStress, fVoid;
+  fPc.open("mcc_drained_softening_pc.txt");
+  fStrain.open("mcc_drained_softening_strain.txt");
+  fStress.open("mcc_drained_softening_p_q.txt");
+  fVoid.open("mcc_drained_softening_void_ratio.txt");
+  // Compute updated stress
+  for (int i = 0; i < nsteps; i++) {
+    // Get dstrain
+    dstrain(0) = dstrain(1) = -dstrainh[i];
+    dstrain(2) = -dstrainv[i];
+    // Compute stress
+    stress =
+        cam_clay->compute_stress(stress, dstrain, particle.get(), &state_vars);
+
+    //! Initialise writing of inputfiles
+    if (i % output_steps == 0) {
+      fPc << state_vars.at("pc") << "\n";
+      fStrain << dstrain(0) << "\t" << dstrain(2) << "\t"
+              << state_vars.at("dpvstrain") << "\t"
+              << state_vars.at("dpdstrain") << "\n";
+      fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
+      fVoid << state_vars.at("void_ratio") << "\n";
+    }
+  }
+  fStress.close();
+  fVoid.close();
+}
+
+//! Check undrained condition with bonding for hardening in 3D
+TEST_CASE("Undrained condition hardening with bonding is checked in 3D",
+          "[material][cam_clay][3D]") {
+  // Tolerance
+  const double Tolerance = 1.E-7;
+
+  const unsigned Dim = 3;
+
+  // Add particle
+  mpm::Index pid = 0;
+  Eigen::Matrix<double, Dim, 1> coords;
+  coords.setZero();
+  auto particle = std::make_shared<mpm::Particle<Dim, 1>>(pid, coords);
+
+  // Initialise material
+  Json jmaterial;
+  jmaterial["density"] = 1000.;
+  jmaterial["youngs_modulus"] = 1.0E+7;
+  jmaterial["poisson_ratio"] = 0.275;
+  jmaterial["p_ref"] = 100000;
+  jmaterial["e_ref"] = 1.12;
+  jmaterial["pc0"] = 200000;
+  jmaterial["ocr"] = 1.;
+  jmaterial["m"] = 1.2;
+  jmaterial["lambda"] = 0.4;
+  jmaterial["kappa"] = 0.05;
+  jmaterial["three_invariants"] = false;
+  jmaterial["bonding"] = true;
+  // Bonding parameters
+  jmaterial["s_h"] = 0.4;
+  jmaterial["mc_a"] = 30000;
+  jmaterial["mc_b"] = 1.6;
+  jmaterial["mc_c"] = 100000;
+  jmaterial["mc_d"] = 1.6;
+  jmaterial["degradation"] = 1.;
 
   SECTION("CamClay check stresses") {
     unsigned id = 0;
@@ -255,12 +566,12 @@ TEST_CASE("drained condition hardening is checked in 3D",
     // Initialise stress
     mpm::Material<Dim>::Vector6d stress;
     stress.setZero();
-    stress(0) = -300000;
-    stress(1) = -300000;
-    stress(2) = -300000;
-    REQUIRE(stress(0) == Approx(-300000.).epsilon(Tolerance));
-    REQUIRE(stress(1) == Approx(-300000.).epsilon(Tolerance));
-    REQUIRE(stress(2) == Approx(-300000.).epsilon(Tolerance));
+    stress(0) = -200000;
+    stress(1) = -200000;
+    stress(2) = -200000;
+    REQUIRE(stress(0) == Approx(-200000.).epsilon(Tolerance));
+    REQUIRE(stress(1) == Approx(-200000.).epsilon(Tolerance));
+    REQUIRE(stress(2) == Approx(-200000.).epsilon(Tolerance));
     REQUIRE(stress(3) == Approx(0.).epsilon(Tolerance));
     REQUIRE(stress(4) == Approx(0.).epsilon(Tolerance));
     REQUIRE(stress(5) == Approx(0.).epsilon(Tolerance));
@@ -277,132 +588,32 @@ TEST_CASE("drained condition hardening is checked in 3D",
     REQUIRE(state_vars.at("shear_modulus") ==
             Approx(3902275.329408).epsilon(Tolerance));
 
-    // Initialise dstrain
-    Eigen::Matrix<double, 262, 1> dstrainv;
-    dstrainv << -0.025, 0.029, 0.032, 0.033, 0.03, 0.034, 0.03, 0.032, 0.031,
-        0.033, 0.03, 0.03, 0.032, 0.031, 0.032, 0.033, 0.03, 0.031, 0.032,
-        0.032, 0.031, 0.029, 0.033, 0.031, 0.031, 0.032, 0.03, 0.032, 0.031,
-        0.032, 0.032, 0.031, 0.032, 0.03, 0.031, 0.033, 0.031, 0.032, 0.03,
-        0.033, 0.032, 0.026, 0.029, 0.032, 0.032, 0.032, 0.032, 0.032, 0.031,
-        0.031, 0.033, 0.03, 0.03, 0.031, 0.031, 0.032, 0.032, 0.03, 0.031,
-        0.031, 0.032, 0.031, 0.03, 0.03, 0.032, 0.031, 0.059, 0.057, 0.058,
-        0.057, 0.057, 0.058, 0.058, 0.055, 0.056, 0.055, 0.058, 0.056, 0.054,
-        0.057, 0.058, 0.058, 0.056, 0.055, 0.057, 0.057, 0.057, 0.056, 0.058,
-        0.056, 0.058, 0.059, 0.058, 0.057, 0.058, 0.058, 0.058, 0.058, 0.059,
-        0.058, 0.059, 0.06, 0.057, 0.06, 0.058000000000001, 0.058, 0.059, 0.058,
-        0.058, 0.058, 0.057, 0.058, 0.057, 0.058, 0.056, 0.058, 0.055, 0.057,
-        0.058, 0.109, 0.1, 0.102, 0.106, 0.102, 0.104, 0.101999999999999,
-        0.103000000000001, 0.1, 0.104, 0.103, 0.105, 0.101999999999999,
-        0.108000000000001, 0.104, 0.101, 0.103, 0.102, 0.105, 0.103,
-        0.103000000000001, 0.103, 0.104, 0.108, 0.103, 0.104, 0.105, 0.105,
-        0.102000000000001, 0.103999999999999, 0.105, 0.106999999999999, 0.106,
-        0.1, 0.107000000000001, 0.103999999999999, 0.105, 0.105, 0.102,
-        0.100999999999999, 0.103, 0.102, 0.108000000000001, 0.103999999999999,
-        0.101000000000001, 0.106, 0.105, 0.107999999999999, 0.104000000000001,
-        0.102, 0.103999999999999, 0.105, 0.103999999999999, 0.107000000000001,
-        0.1, 0.103, 0.103999999999999, 0.103, 0.105, 0.108000000000001, 0.103,
-        0.106999999999999, 0.103000000000002, 0.106999999999999, 0.109,
-        0.103999999999999, 0.107000000000001, 0.105, 0.107999999999999, 0.102,
-        0.104000000000001, 0.107999999999999, 0.104000000000001,
-        0.106999999999999, 0.108000000000001, 0.103, 0.103999999999999, 0.102,
-        0.103, 0.109, 0.104000000000001, 0.102, 0.106, 0.103999999999999, 0.106,
-        0.101000000000001, 0.106, 0.103999999999999, 0.108000000000001, 0.106,
-        0.102, 0.105, 0.104999999999999, 0.104000000000001, 0.105,
-        0.109999999999999, 0.100999999999999, 0.103, 0.104000000000001,
-        0.103999999999999, 0.106, 0.105, 0.104000000000001, 0.106, 0.106, 0.102,
-        0.105999999999998, 0.106000000000002, 0.106999999999999,
-        0.106999999999999, 0.101000000000003, 0.103999999999999, 0.105,
-        0.102999999999998, 0.105, 0.108000000000001, 0.102999999999998, 0.102,
-        0.102, 0.104000000000003, 0.099999999999998, 0.102, 0.105,
-        0.103000000000002, 0.107999999999997, 0.105, 0.108000000000001,
-        0.106999999999999, 0.105, 0.106000000000002, 0.108000000000001,
-        0.101999999999997, 0.104000000000003, 0.102, 0.103999999999999,
-        0.103999999999999, 0.106000000000002, 0.100999999999999,
-        0.108000000000001, 0.102999999999998, 0.100000000000001,
-        0.099999999999998, 0.102;
-
-    Eigen::Matrix<double, 262, 1> dstrainh;
-    dstrainh << 0.008333333333333, -0.009666666666667, -0.011,
-        -0.011333333333333, -0.011, -0.015, -0.013666666666667,
-        -0.014666666666667, -0.014666666666667, -0.016, -0.014333333333333,
-        -0.014666666666667, -0.014666666666667, -0.014666666666667,
-        -0.014666666666667, -0.015, -0.013666666666667, -0.013666666666667,
-        -0.014333333333333, -0.014, -0.013333333333333, -0.012333333333333,
-        -0.013666666666667, -0.013, -0.012666666666667, -0.012666666666667,
-        -0.012, -0.012333333333333, -0.012, -0.012333333333333, -0.012,
-        -0.011333333333333, -0.011666666666667, -0.011, -0.011,
-        -0.011666666666667, -0.010666666666667, -0.011, -0.01, -0.011,
-        -0.010666666666667, -0.008666666666667, -0.009666666666667,
-        -0.010333333333333, -0.01, -0.010333333333333, -0.009666666666667,
-        -0.01, -0.009333333333333, -0.009333333333333, -0.01,
-        -0.008666666666667, -0.008666666666667, -0.009333333333333, -0.009,
-        -0.009, -0.009333333333333, -0.008333333333333, -0.008666666666667,
-        -0.008333333333333, -0.009, -0.008333333333333, -0.008333333333333,
-        -0.007666666666667, -0.008666666666667, -0.008333333333333,
-        -0.015666666666667, -0.014666666666667, -0.015, -0.014333333333333,
-        -0.014, -0.014333333333333, -0.014333333333333, -0.013,
-        -0.013333333333333, -0.013, -0.013666666666667, -0.013,
-        -0.012333333333333, -0.013, -0.013333333333334, -0.013,
-        -0.012666666666667, -0.012, -0.012666666666667, -0.012333333333333,
-        -0.012666666666667, -0.012, -0.012666666666667, -0.012,
-        -0.012333333333333, -0.012666666666667, -0.012333333333334, -0.012,
-        -0.012, -0.012333333333334, -0.012, -0.012, -0.012333333333333, -0.012,
-        -0.012, -0.012666666666667, -0.011666666666667, -0.012666666666666,
-        -0.011666666666667, -0.011666666666667, -0.011666666666667,
-        -0.011666666666667, -0.011666666666667, -0.011666666666667, -0.011,
-        -0.011333333333333, -0.011, -0.011333333333334, -0.011, -0.011,
-        -0.010333333333333, -0.011, -0.011, -0.020666666666666,
-        -0.018666666666667, -0.019, -0.02, -0.019, -0.019666666666667, -0.019,
-        -0.019, -0.019, -0.019666666666666, -0.019, -0.02, -0.019,
-        -0.020666666666667, -0.019666666666667, -0.018666666666667,
-        -0.019333333333333, -0.019333333333333, -0.019666666666667, -0.019,
-        -0.019333333333334, -0.019333333333333, -0.02, -0.020333333333333,
-        -0.019333333333334, -0.019666666666666, -0.020333333333334,
-        -0.020333333333333, -0.019666666666667, -0.02, -0.02,
-        -0.020666666666667, -0.020666666666666, -0.019, -0.021, -0.02,
-        -0.020333333333333, -0.020333333333334, -0.019666666666667,
-        -0.019333333333333, -0.02, -0.02, -0.021333333333334,
-        -0.020333333333333, -0.019666666666667, -0.021333333333333,
-        -0.020666666666667, -0.021333333333333, -0.021, -0.020333333333333,
-        -0.020666666666666, -0.021, -0.020666666666667, -0.021666666666667,
-        -0.019666666666666, -0.020666666666667, -0.021, -0.020666666666667,
-        -0.021666666666667, -0.022, -0.021333333333334, -0.022333333333333,
-        -0.021000000000001, -0.022666666666666, -0.023, -0.022333333333334,
-        -0.023, -0.022, -0.023333333333333, -0.022, -0.022333333333334,
-        -0.023666666666666, -0.022, -0.023666666666667, -0.023333333333334,
-        -0.022, -0.022666666666666, -0.022, -0.022333333333334, -0.024, -0.023,
-        -0.022666666666667, -0.023666666666667, -0.023333333333332,
-        -0.024000000000001, -0.022666666666667, -0.024333333333333,
-        -0.023333333333334, -0.025, -0.025, -0.021666666666667,
-        -0.024333333333333, -0.024333333333334, -0.024, -0.024333333333333,
-        -0.025666666666667, -0.023666666666666, -0.024333333333334,
-        -0.024333333333333, -0.025, -0.025, -0.025333333333334, -0.025, -0.026,
-        -0.026, -0.025333333333334, -0.026666666666666, -0.026666666666667,
-        -0.027, -0.027333333333333, -0.025666666666667, -0.027666666666667,
-        -0.027000000000001, -0.025999999999999, -0.026666666666667,
-        -0.027666666666667, -0.026333333333333, -0.026333333333334,
-        -0.026333333333333, -0.026666666666667, -0.026, -0.026333333333334,
-        -0.027666666666667, -0.027, -0.028666666666665, -0.027666666666668,
-        -0.028666666666666, -0.028666666666667, -0.028000000000001,
-        -0.028666666666667, -0.029333333333333, -0.027666666666666,
-        -0.029666666666667, -0.029333333333334, -0.029666666666667,
-        -0.029999999999999, -0.030333333333334, -0.029, -0.030666666666667,
-        -0.029333333333333, -0.028333333333334, -0.028666666666665,
-        -0.029000000000001;
-
+    // Initialise strain
     mpm::Material<Dim>::Vector6d dstrain;
     dstrain.setZero();
+    dstrain(0) = 0.00100000;
+    dstrain(1) = 0.00100000;
+    dstrain(2) = -0.00200000;
+    dstrain(3) = 0.0000000;
+    dstrain(4) = 0.0000000;
+    dstrain(5) = 0.0000000;
 
     // Define the steps
-    const int iter = 262;
-    std::ofstream fStress, fVoid;
-    fStress.open("mcc_drained_hardening_p_q.txt");
-    fVoid.open("mcc_drained_hardening_void_ratio.txt");
+    const int iter = 1000;
+    std::ofstream fPc, fPcc, fPcd, fStrain, fStress, fVoid, fChi;
+    fPc.open("mcc_bonding_undrained_hardening_pc.txt");
+    fPcc.open("mcc_bonding_undrained_hardening_pcc.txt");
+    fPcd.open("mcc_bonding_undrained_hardening_pcd.txt");
+    fStrain.open("mcc_bonding_undrained_hardening_strain.txt");
+    fStress.open("mcc_bonding_undrained_hardening_p_q.txt");
+    fVoid.open("mcc_bonding_undrained_hardening_void_ratio.txt");
+    fChi.open("mcc_bonding_undrained_hardening_chi.txt");
     // Compute updated stress
     for (int i = 0; i < iter; i++) {
-      // Get dstrain
-      dstrain(0) = dstrain(1) = -dstrainh(i) / 100;
-      dstrain(2) = -dstrainv(i) / 100;
+      fPc << state_vars.at("pc") << "\n";
+      fStrain << dstrain(0) << "\t" << dstrain(2) << "\t"
+              << state_vars.at("dpvstrain") << "\t"
+              << state_vars.at("dpdstrain") << "\n";
       // Compute stress
       stress = cam_clay->compute_stress(stress, dstrain, particle.get(),
                                         &state_vars);
@@ -410,15 +621,346 @@ TEST_CASE("drained condition hardening is checked in 3D",
       //! Initialise writing of inputfiles
       fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
       fVoid << state_vars.at("void_ratio") << "\n";
+      fChi << state_vars.at("chi") << "\n";
+      fPcc << state_vars.at("pcc") << "\n";
+      fPcd << state_vars.at("pcd") << "\n";
     }
+    fPc.close();
+    fPcc.close();
+    fPcd.close();
+    fStrain.close();
     fStress.close();
     fVoid.close();
-    // Check stressees
-    // REQUIRE(stress(0) == Approx(-300000).epsilon(Tolerance));
-    // REQUIRE(stress(1) == Approx(-300000).epsilon(Tolerance));
-    // REQUIRE(stress(2) == Approx(-300000).epsilon(Tolerance));
-    // REQUIRE(stress(3) == Approx(0.000000e+00).epsilon(Tolerance));
-    // REQUIRE(stress(4) == Approx(0.000000e+00).epsilon(Tolerance));
-    // REQUIRE(stress(5) == Approx(0.000000e+00).epsilon(Tolerance));
+    fChi.close();
+  }
+}
+
+//! Check undrained condition with bonding for softening in 3D
+TEST_CASE("Undrained condition softening with bonding is checked in 3D",
+          "[material][cam_clay][3D]") {
+  // Tolerance
+  const double Tolerance = 1.E-7;
+
+  const unsigned Dim = 3;
+
+  // Add particle
+  mpm::Index pid = 0;
+  Eigen::Matrix<double, Dim, 1> coords;
+  coords.setZero();
+  auto particle = std::make_shared<mpm::Particle<Dim, 1>>(pid, coords);
+
+  // Initialise material
+  Json jmaterial;
+  jmaterial["density"] = 1000.;
+  jmaterial["youngs_modulus"] = 1.0E+7;
+  jmaterial["poisson_ratio"] = 0.275;
+  jmaterial["p_ref"] = 100000;
+  jmaterial["e_ref"] = 1.12;
+  jmaterial["pc0"] = 200000;
+  jmaterial["ocr"] = 4.;
+  jmaterial["m"] = 1.2;
+  jmaterial["lambda"] = 0.4;
+  jmaterial["kappa"] = 0.05;
+  jmaterial["three_invariants"] = false;
+  jmaterial["bonding"] = true;
+  // Bonding parameters
+  jmaterial["s_h"] = 0.4;
+  jmaterial["mc_a"] = 30000;
+  jmaterial["mc_b"] = 1.6;
+  jmaterial["mc_c"] = 100000;
+  jmaterial["mc_d"] = 1.6;
+  jmaterial["degradation"] = 1.;
+
+  SECTION("CamClay check stresses") {
+    unsigned id = 0;
+    auto material =
+        Factory<mpm::Material<Dim>, unsigned, const Json&>::instance()->create(
+            "CamClay3D", std::move(id), jmaterial);
+
+    auto cam_clay = std::make_shared<mpm::CamClay<Dim>>(id, jmaterial);
+
+    REQUIRE(material->id() == 0);
+
+    // Initialise stress
+    mpm::Material<Dim>::Vector6d stress;
+    stress.setZero();
+    stress(0) = -50000;
+    stress(1) = -50000;
+    stress(2) = -50000;
+    REQUIRE(stress(0) == Approx(-50000.).epsilon(Tolerance));
+    REQUIRE(stress(1) == Approx(-50000.).epsilon(Tolerance));
+    REQUIRE(stress(2) == Approx(-50000.).epsilon(Tolerance));
+    REQUIRE(stress(3) == Approx(0.).epsilon(Tolerance));
+    REQUIRE(stress(4) == Approx(0.).epsilon(Tolerance));
+    REQUIRE(stress(5) == Approx(0.).epsilon(Tolerance));
+
+    // Compute stress invariants
+    mpm::dense_map state_vars = material->initialise_state_variables();
+    mpm::Material<Dim>::Vector6d n;
+    cam_clay->compute_stress_invariants(stress, n, &state_vars);
+
+    // Initialise strain
+    mpm::Material<Dim>::Vector6d dstrain;
+    dstrain.setZero();
+    dstrain(0) = 0.00100000;
+    dstrain(1) = 0.00100000;
+    dstrain(2) = -0.00200000;
+    dstrain(3) = 0.0000000;
+    dstrain(4) = 0.0000000;
+    dstrain(5) = 0.0000000;
+
+    // Define the steps
+    const int iter = 1000;
+    std::ofstream fPc, fPcc, fPcd, fStrain, fStress, fVoid, fChi;
+    fPc.open("mcc_bonding_undrained_softening_pc.txt");
+    fPcc.open("mcc_bonding_undrained_softening_pcc.txt");
+    fPcd.open("mcc_bonding_undrained_softening_pcd.txt");
+    fStrain.open("mcc_bonding_undrained_softening_strain.txt");
+    fStress.open("mcc_bonding_undrained_softening_p_q.txt");
+    fVoid.open("mcc_bonding_undrained_softening_void_ratio.txt");
+    fChi.open("mcc_bonding_undrained_softening_chi.txt");
+    // Compute updated stress
+    for (int i = 0; i < iter; i++) {
+      fPc << state_vars.at("pc") << "\n";
+      fStrain << dstrain(0) << "\t" << dstrain(2) << "\t"
+              << state_vars.at("dpvstrain") << "\t"
+              << state_vars.at("dpdstrain") << "\n";
+      // Compute stress
+      stress = cam_clay->compute_stress(stress, dstrain, particle.get(),
+                                        &state_vars);
+
+      //! Initialise writing of inputfiles
+      fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
+      fVoid << state_vars.at("void_ratio") << "\n";
+      fChi << state_vars.at("chi") << "\n";
+      fPcc << state_vars.at("pcc") << "\n";
+      fPcd << state_vars.at("pcd") << "\n";
+    }
+    fPc.close();
+    fPcc.close();
+    fPcd.close();
+    fStrain.close();
+    fStress.close();
+    fVoid.close();
+    fChi.close();
+  }
+}
+
+//! Check undrained condition with three_invariance for hardening in 3D
+TEST_CASE(
+    "Undrained condition hardening with three_invariance is checked in 3D",
+    "[material][cam_clay][3D]") {
+  // Tolerance
+  const double Tolerance = 1.E-7;
+
+  const unsigned Dim = 3;
+
+  // Add particle
+  mpm::Index pid = 0;
+  Eigen::Matrix<double, Dim, 1> coords;
+  coords.setZero();
+  auto particle = std::make_shared<mpm::Particle<Dim, 1>>(pid, coords);
+
+  // Initialise material
+  Json jmaterial;
+  jmaterial["density"] = 1000.;
+  jmaterial["youngs_modulus"] = 1.0E+7;
+  jmaterial["poisson_ratio"] = 0.275;
+  jmaterial["p_ref"] = 100000;
+  jmaterial["e_ref"] = 1.12;
+  jmaterial["pc0"] = 200000;
+  jmaterial["ocr"] = 1.;
+  jmaterial["m"] = 1.2;
+  jmaterial["lambda"] = 0.4;
+  jmaterial["kappa"] = 0.05;
+  jmaterial["three_invariants"] = true;
+  jmaterial["bonding"] = false;
+
+  SECTION("CamClay check stresses") {
+    unsigned id = 0;
+    auto material =
+        Factory<mpm::Material<Dim>, unsigned, const Json&>::instance()->create(
+            "CamClay3D", std::move(id), jmaterial);
+
+    auto cam_clay = std::make_shared<mpm::CamClay<Dim>>(id, jmaterial);
+
+    REQUIRE(material->id() == 0);
+
+    // Initialise stress
+    mpm::Material<Dim>::Vector6d stress;
+    stress.setZero();
+    stress(0) = -200000;
+    stress(1) = -200000;
+    stress(2) = -200000;
+    REQUIRE(stress(0) == Approx(-200000.).epsilon(Tolerance));
+    REQUIRE(stress(1) == Approx(-200000.).epsilon(Tolerance));
+    REQUIRE(stress(2) == Approx(-200000.).epsilon(Tolerance));
+    REQUIRE(stress(3) == Approx(0.).epsilon(Tolerance));
+    REQUIRE(stress(4) == Approx(0.).epsilon(Tolerance));
+    REQUIRE(stress(5) == Approx(0.).epsilon(Tolerance));
+
+    // Compute stress invariants
+    mpm::dense_map state_vars = material->initialise_state_variables();
+    mpm::Material<Dim>::Vector6d n;
+    cam_clay->compute_stress_invariants(stress, n, &state_vars);
+
+    // Compute elastic modulus
+    cam_clay->compute_elastic_tensor(&state_vars);
+    REQUIRE(state_vars.at("bulk_modulus") ==
+            Approx(7370964.511104).epsilon(Tolerance));
+    REQUIRE(state_vars.at("shear_modulus") ==
+            Approx(3902275.329408).epsilon(Tolerance));
+
+    // Initialise strain
+    mpm::Material<Dim>::Vector6d dstrain;
+    dstrain.setZero();
+    dstrain(0) = 0.00100000;
+    dstrain(1) = 0.00100000;
+    dstrain(2) = -0.00200000;
+    dstrain(3) = 0.0000000;
+    dstrain(4) = 0.0000000;
+    dstrain(5) = 0.0000000;
+
+    // Define the steps
+    const int iter = 1000;
+    std::ofstream fPc, fPcc, fPcd, fStrain, fStress, fVoid, fMtheta;
+    fPc.open("mcc_three_invariance_undrained_hardening_pc.txt");
+    fPcc.open("mcc_three_invariance_undrained_hardening_pcc.txt");
+    fPcd.open("mcc_three_invariance_undrained_hardening_pcd.txt");
+    fStrain.open("mcc_three_invariance_undrained_hardening_strain.txt");
+    fStress.open("mcc_three_invariance_undrained_hardening_p_q.txt");
+    fVoid.open("mcc_three_invariance_undrained_hardening_void_ratio.txt");
+    fMtheta.open("mcc_three_invariance_undrained_hardening_mtheta.txt");
+    // Compute updated stress
+    for (int i = 0; i < iter; i++) {
+      fPc << state_vars.at("pc") << "\n";
+      fStrain << dstrain(0) << "\t" << dstrain(2) << "\t"
+              << state_vars.at("dpvstrain") << "\t"
+              << state_vars.at("dpdstrain") << "\n";
+      // Compute stress
+      stress = cam_clay->compute_stress(stress, dstrain, particle.get(),
+                                        &state_vars);
+
+      //! Initialise writing of inputfiles
+      fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
+      fVoid << state_vars.at("void_ratio") << "\n";
+      fMtheta << state_vars.at("theta") << "\t" << state_vars.at("m_theta")
+              << "\n";
+      fPcc << state_vars.at("pcc") << "\n";
+      fPcd << state_vars.at("pcd") << "\n";
+    }
+    fPc.close();
+    fPcc.close();
+    fPcd.close();
+    fStrain.close();
+    fStress.close();
+    fVoid.close();
+    fMtheta.close();
+  }
+}
+
+//! Check undrained condition with three_invariance for softening in 3D
+TEST_CASE(
+    "Undrained condition softening with three_invariance is checked in 3D",
+    "[material][cam_clay][3D]") {
+  // Tolerance
+  const double Tolerance = 1.E-7;
+
+  const unsigned Dim = 3;
+
+  // Add particle
+  mpm::Index pid = 0;
+  Eigen::Matrix<double, Dim, 1> coords;
+  coords.setZero();
+  auto particle = std::make_shared<mpm::Particle<Dim, 1>>(pid, coords);
+
+  // Initialise material
+  Json jmaterial;
+  jmaterial["density"] = 1000.;
+  jmaterial["youngs_modulus"] = 1.0E+7;
+  jmaterial["poisson_ratio"] = 0.275;
+  jmaterial["p_ref"] = 100000;
+  jmaterial["e_ref"] = 1.12;
+  jmaterial["pc0"] = 200000;
+  jmaterial["ocr"] = 4.;
+  jmaterial["m"] = 1.2;
+  jmaterial["lambda"] = 0.4;
+  jmaterial["kappa"] = 0.05;
+  jmaterial["three_invariants"] = true;
+  jmaterial["bonding"] = false;
+
+  SECTION("CamClay check stresses") {
+    unsigned id = 0;
+    auto material =
+        Factory<mpm::Material<Dim>, unsigned, const Json&>::instance()->create(
+            "CamClay3D", std::move(id), jmaterial);
+
+    auto cam_clay = std::make_shared<mpm::CamClay<Dim>>(id, jmaterial);
+
+    REQUIRE(material->id() == 0);
+
+    // Initialise stress
+    mpm::Material<Dim>::Vector6d stress;
+    stress.setZero();
+    stress(0) = -50000;
+    stress(1) = -50000;
+    stress(2) = -50000;
+    REQUIRE(stress(0) == Approx(-50000.).epsilon(Tolerance));
+    REQUIRE(stress(1) == Approx(-50000.).epsilon(Tolerance));
+    REQUIRE(stress(2) == Approx(-50000.).epsilon(Tolerance));
+    REQUIRE(stress(3) == Approx(0.).epsilon(Tolerance));
+    REQUIRE(stress(4) == Approx(0.).epsilon(Tolerance));
+    REQUIRE(stress(5) == Approx(0.).epsilon(Tolerance));
+
+    // Compute stress invariants
+    mpm::dense_map state_vars = material->initialise_state_variables();
+    mpm::Material<Dim>::Vector6d n;
+    cam_clay->compute_stress_invariants(stress, n, &state_vars);
+
+    // Initialise strain
+    mpm::Material<Dim>::Vector6d dstrain;
+    dstrain.setZero();
+    dstrain(0) = 0.00100000;
+    dstrain(1) = 0.00100000;
+    dstrain(2) = -0.00200000;
+    dstrain(3) = 0.0000000;
+    dstrain(4) = 0.0000000;
+    dstrain(5) = 0.0000000;
+
+    // Define the steps
+    const int iter = 1000;
+    std::ofstream fPc, fPcc, fPcd, fStrain, fStress, fVoid, fMtheta;
+    fPc.open("mcc_three_invariance_undrained_softening_pc.txt");
+    fPcc.open("mcc_three_invariance_undrained_softening_pcc.txt");
+    fPcd.open("mcc_three_invariance_undrained_softening_pcd.txt");
+    fStrain.open("mcc_three_invariance_undrained_softening_strain.txt");
+    fStress.open("mcc_three_invariance_undrained_softening_p_q.txt");
+    fVoid.open("mcc_three_invariance_undrained_softening_void_ratio.txt");
+    fMtheta.open("mcc_three_invariance_undrained_softening_mtheta.txt");
+    // Compute updated stress
+    for (int i = 0; i < iter; i++) {
+      fPc << state_vars.at("pc") << "\n";
+      fStrain << dstrain(0) << "\t" << dstrain(2) << "\t"
+              << state_vars.at("dpvstrain") << "\t"
+              << state_vars.at("dpdstrain") << "\n";
+      // Compute stress
+      stress = cam_clay->compute_stress(stress, dstrain, particle.get(),
+                                        &state_vars);
+
+      //! Initialise writing of inputfiles
+      fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
+      fVoid << state_vars.at("void_ratio") << "\n";
+      fMtheta << state_vars.at("theta") << "\t" << state_vars.at("m_theta")
+              << "\n";
+      fPcc << state_vars.at("pcc") << "\n";
+      fPcd << state_vars.at("pcd") << "\n";
+    }
+    fPc.close();
+    fPcc.close();
+    fPcd.close();
+    fStrain.close();
+    fStress.close();
+    fVoid.close();
+    fMtheta.close();
   }
 }
