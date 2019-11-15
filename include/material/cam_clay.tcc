@@ -306,6 +306,7 @@ void mpm::CamClay<Tdim>::compute_bonding_parameters(
   (*state_vars).at("chi") =
       (*chi) - degradation_ * (*chi) * (*state_vars).at("dpdstrain");
   if ((*state_vars).at("chi") < 0.) (*state_vars).at("chi") = 0.;
+  if ((*state_vars).at("chi") > 1.) (*state_vars).at("chi") = 1.;
   // Compute mechanical hydrate saturation
   const double s_h_mec = (*state_vars).at("chi") * s_h_;
   // Compute pcd
@@ -341,11 +342,11 @@ void mpm::CamClay<Tdim>::compute_df_dmul(const mpm::dense_map* state_vars,
   // Upsilon
   double upsilon = (1 + (*state_vars).at("void_ratio")) / (lambda_ - kappa_);
   // A_den
-  double a_den = 1 + (2 * e_b + upsilon * pc) * mul;
+  double a_den = 1 + (2 * e_b + upsilon * (pc + pcd)) * mul;
   // Compute dp / dmul
   double dp_dmul = -e_b * (2 * p - pc - pcd) / a_den;
   // Compute dpc / dmul
-  double dpc_dmul = upsilon * pc * (2 * p - pc - pcd) / a_den;
+  double dpc_dmul = upsilon * (pc + pcd) * (2 * p - pc - pcd) / a_den;
   // Compute dq / dmul
   double dq_dmul = -q / (mul + pow(m_theta, 2) / (6 * e_s));
   // Compute dF / dmul
@@ -358,24 +359,17 @@ void mpm::CamClay<Tdim>::compute_df_dmul(const mpm::dense_map* state_vars,
     // Compute dF / dpcc
     double df_dpcc = -2 * pcc - pc - pcd;
     // Compute dpcd / dmul
-    double dpcd_dmul =
-        -2 * mc_b_ * degradation_ * q / (6 * e_s * mul + pow(m_theta, 2)) * pcd;
+    double dpcd_dmul = 0;
+    if (pcd > std::numeric_limits<double>::min())
+      dpcd_dmul = -sqrt(6.) * mc_b_ * degradation_ * q /
+                  (6 * e_s * mul + pow(m_theta, 2)) * pcd;
     // Compute dpcc / dmul
-    double dpcc_dmul =
-        -2 * mc_d_ * degradation_ * q / (6 * e_s * mul + pow(m_theta, 2)) * pcc;
-    // Compute dp / dmul
-    dp_dmul +=
-        (e_b * mul *
-         (pc * upsilon * mul * (1 + pc * upsilon * mul - 2 * e_b * mul) + 1) /
-         ((1 + 2 * e_b * mul) * (1 + pc * upsilon * mul) *
-          (1 + 2 * e_b * mul + pc * upsilon * mul)) *
-         dpcd_dmul);
-    // Compute dpc / dmul
-    dpc_dmul +=
-        (pc * upsilon * mul *
-         (2 * e_b * mul * (pc * upsilon * mul - 2 * e_b * mul - 1) - 1) /
-         (pow((1 + 2 * e_b * mul), 2) * pow((1 + pc * upsilon * mul), 2)) *
-         dpcd_dmul);
+    double dpcc_dmul = 0;
+    if (pcc > std::numeric_limits<double>::min())
+      dpcc_dmul = -sqrt(6.) * mc_d_ * degradation_ * q /
+                  (6 * e_s * mul + pow(m_theta, 2)) * pcc;
+    // Compute dpc /dmul
+    dpc_dmul -= dpcd_dmul;
     // Compute dF / dmul
     (*df_dmul) = (df_dp * dp_dmul) + (df_dq * dq_dmul) + (df_dpc * dpc_dmul) +
                  (df_dpcd * dpcd_dmul) + (df_dpcc * dpcc_dmul);
@@ -572,8 +566,8 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
   // Iteration for consistency parameter
   while (fabs((*state_vars).at("f_function")) > Ftolerance &&
          counter_f < itrstep) {
-    // Get back the m_theta of trial_stress        
-    (*state_vars).at("m_theta") = m_theta_trial;       
+    // Get back the m_theta of trial_stress
+    (*state_vars).at("m_theta") = m_theta_trial;
     // Compute dF / dmul
     this->compute_df_dmul(state_vars, &df_dmul);
     // Update consistency parameter
@@ -632,7 +626,7 @@ Eigen::Matrix<double, 6, 1> mpm::CamClay<Tdim>::compute_stress(
       this->compute_stress_invariants(updated_stress, n_trial, state_vars);
       // Update Mtheta
       (*state_vars).at("m_theta") =
-        m_ - pow(m_, 2) / (3 + m_) * cos(1.5 * (*state_vars).at("theta"));
+          m_ - pow(m_, 2) / (3 + m_) * cos(1.5 * (*state_vars).at("theta"));
     }
     // Update yield function
     yield_type = this->compute_yield_state(state_vars);
