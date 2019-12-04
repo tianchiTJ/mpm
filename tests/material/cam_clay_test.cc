@@ -315,7 +315,7 @@ TEST_CASE("drained condition hardening is checked in 3D",
       // Update pc
       pc *= exp((1 + e) /
                 (material->property("lambda") - material->property("kappa")) *
-                delta_phi * (2 * p - pc));
+                delta_phi * df_dp);
     }
   }
 
@@ -469,7 +469,7 @@ TEST_CASE("drained condition softening is checked in 3D",
       // Update pc
       pc *= exp((1 + e) /
                 (material->property("lambda") - material->property("kappa")) *
-                delta_phi * (2 * p - pc));
+                delta_phi * df_dp);
     }
   }
 
@@ -844,24 +844,42 @@ TEST_CASE("drained condition hardening with bonding is checked in 3D",
       const double df_dq = 2 * q;
       const double df_dp =
           pow(material->property("m"), 2) * (2 * p - (pc + pcd));
-      const double hardening =
-          pow(p, 2) * (pow(material->property("m"), 4) - pow(eta, 4)) *
-              material->property("kappa") /
-              (material->property("lambda") - material->property("kappa")) *
-              e_b +
-          (-2 * pcc - pc - pcd) *
-              (-material->property("degradation") * material->property("mc_a") *
-               material->property("mc_b") *
-               pow(chi * material->property("s_h"),
-                   material->property("mc_b"))) +
-          (-p - pcc) *
-              (-material->property("degradation") * material->property("mc_c") *
-               material->property("mc_d") *
-               pow(chi * material->property("s_h"),
-                   material->property("mc_d")));
+      // Compute hardening parameter
+      const double df_dpc = pow(material->property("m"), 2) * (-p - pcc);
+      const double dpc_dvstrainp =
+          (1 + e) /
+          (material->property("lambda") - material->property("kappa")) * pc;
+      const double df_dpcc =
+          pow(material->property("m"), 2) * (-2 * pcc - pc - pcd);
+      const double dpcc_ddstrainp =
+          -material->property("degradation") * material->property("mc_d") * pcc;
+      const double df_dpcd = df_dpc;
+      const double dpcd_ddstrainp =
+          -material->property("degradation") * material->property("mc_b") * pcd;
+      const double hardening = df_dpc * dpc_dvstrainp * df_dp +
+                               df_dpcc * dpcc_ddstrainp * df_dq +
+                               df_dpcd * dpcd_ddstrainp * df_dq;
+      // const double hardening =
+      //    pow(p, 2) * (pow(material->property("m"), 4) - pow(eta, 4)) *
+      //        material->property("kappa") /
+      //        (material->property("lambda") - material->property("kappa")) *
+      //        e_b +
+      //    (-2 * pcc - pc - pcd) *
+      //        (-material->property("degradation") * material->property("mc_a")
+      //        *
+      //         material->property("mc_b") *
+      //         pow(chi * material->property("s_h"),
+      //             material->property("mc_b"))) +
+      //    (-p - pcc) *
+      //        (-material->property("degradation") * material->property("mc_c")
+      //        *
+      //         material->property("mc_d") *
+      //         pow(chi * material->property("s_h"),
+      //             material->property("mc_d")));
+
       const double delta_phi =
           (e_b * df_dp * dstrainp + 3 * e_s * df_dq * dstrainq) /
-          (hardening + e_b * df_dp * df_dp + 3 * e_s * df_dq * df_dq);
+          (-hardening + e_b * df_dp * df_dp + 3 * e_s * df_dq * df_dq);
       // Compute dp, dq
       const double dq = 3 * e_s * (dstrainq - delta_phi * df_dq);
       const double dp = dq / 3;
@@ -877,7 +895,7 @@ TEST_CASE("drained condition hardening with bonding is checked in 3D",
       // Update pc
       pc *= exp((1 + e) /
                 (material->property("lambda") - material->property("kappa")) *
-                delta_phi * (2 * p - pc));
+                delta_phi * df_dp);
       // Bonded parameters
       chi -= material->property("degradation") * chi *
              (delta_phi * (sqrt(6) * q / pow(material->property("m"), 2)));
