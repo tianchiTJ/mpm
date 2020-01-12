@@ -762,25 +762,25 @@ TEST_CASE("drained condition hardening with bonding is checked in 3D",
 
   // Initialise material
   Json jmaterial;
-  jmaterial["density"] = 1000.;
+  jmaterial["density"] = 2129.;
   jmaterial["youngs_modulus"] = 1.0E+7;
-  jmaterial["poisson_ratio"] = 0.275;
-  jmaterial["p_ref"] = 100000;
+  jmaterial["poisson_ratio"] = 0.25;
+  jmaterial["p_ref"] = 500;
   jmaterial["e_ref"] = 1.12;
-  jmaterial["pc0"] = 200000;
+  jmaterial["pc0"] = 4000;
   jmaterial["ocr"] = 1.;
-  jmaterial["m"] = 1.2;
+  jmaterial["m"] = 1.295247;
   jmaterial["lambda"] = 0.4;
   jmaterial["kappa"] = 0.05;
   jmaterial["three_invariants"] = false;
   jmaterial["bonding"] = true;
   // Bonding parameters
-  jmaterial["s_h"] = 0.4;
-  jmaterial["mc_a"] = 30000;
-  jmaterial["mc_b"] = 1.6;
-  jmaterial["mc_c"] = 100000;
-  jmaterial["mc_d"] = 1.6;
-  jmaterial["degradation"] = 1.;
+  jmaterial["s_h"] = 1.;
+  jmaterial["mc_a"] = 0;
+  jmaterial["mc_b"] = 1.;
+  jmaterial["mc_c"] = 2000;
+  jmaterial["mc_d"] = 1.;
+  jmaterial["degradation"] = 1;
 
   unsigned id = 0;
   auto material =
@@ -790,7 +790,7 @@ TEST_CASE("drained condition hardening with bonding is checked in 3D",
   auto cam_clay = std::make_shared<mpm::CamClay<Dim>>(id, jmaterial);
 
   // Number of steps
-  const unsigned long long nsteps = 200000;
+  const unsigned long long nsteps = 400000;
   // Interval of output step;
   const unsigned output_steps = 1000;
   // Initialise dstrain

@@ -75,8 +75,7 @@ class CamClay : public Material<Tdim> {
   //! Compute bonding parameters
   //! \param[in] chi Degredation
   //! \param[in] state_vars History-dependent state variables
-  void compute_bonding_parameters(const double* chi,
-                                  mpm::dense_map* state_vars);
+  void compute_bonding_parameters(const double chi, mpm::dense_map* state_vars);
 
   //! Compute dF/dmul
   //! \param[in] state_vars History-dependent state variables
@@ -110,6 +109,10 @@ class CamClay : public Material<Tdim> {
   //! \retval status of computation
   bool compute_plastic_tensor(const Vector6d& stress,
                               mpm::dense_map* state_vars);
+
+  Matrix6x6& de() { return de_; }
+
+  Matrix6x6& dp() { return dp_; }
 
  protected:
   //! material id
@@ -150,21 +153,28 @@ class CamClay : public Material<Tdim> {
   double kappa_{std::numeric_limits<double>::max()};
   //! Three invariants
   bool three_invariants_{false};
+  //! Subloading surface properties
+  //! Subloading status
+  bool subloading_{false};
+  //! Subloading surface ratio
+  double subloading_r_{1.};
   //! Bonding properties
   //! Bonding status
   bool bonding_{false};
   //! Material constants a
-  double mc_a_{std::numeric_limits<double>::max()};
+  double mc_a_{std::numeric_limits<double>::epsilon()};
   //! Material constants b
-  double mc_b_{std::numeric_limits<double>::max()};
+  double mc_b_{std::numeric_limits<double>::epsilon()};
   //! Material constants c
-  double mc_c_{std::numeric_limits<double>::max()};
+  double mc_c_{std::numeric_limits<double>::epsilon()};
   //! Material constants d
-  double mc_d_{std::numeric_limits<double>::max()};
+  double mc_d_{std::numeric_limits<double>::epsilon()};
   //! Degradation
-  double degradation_{std::numeric_limits<double>::max()};
+  double m_degradation_{std::numeric_limits<double>::epsilon()};
+  // Increment in shear modulus
+  double m_shear_ = {std::numeric_limits<double>::epsilon()};
   //! Hydrate saturation
-  double s_h_{std::numeric_limits<double>::max()};
+  double s_h_{std::numeric_limits<double>::epsilon()};
 };  // CamClay class
 }  // namespace mpm
 

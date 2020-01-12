@@ -1,15 +1,20 @@
 #ifndef MPM_MATERIAL_MOHR_COULOMB_H_
 #define MPM_MATERIAL_MOHR_COULOMB_H_
 
-#include <limits>
-
 #include <cmath>
+
+#include <limits>
 
 #include "Eigen/Dense"
 
 #include "material.h"
 
 namespace mpm {
+
+namespace mohrcoulomb {
+//! Failure state
+enum FailureState { Elastic, Tensile, Shear };
+}  // namespace mohrcoulomb
 
 //! MohrCoulomb class
 //! \brief Mohr Coulomb material model
@@ -22,9 +27,6 @@ class MohrCoulomb : public Material<Tdim> {
   using Vector6d = Eigen::Matrix<double, 6, 1>;
   //! Define a Matrix of 6 x 6
   using Matrix6x6 = Eigen::Matrix<double, 6, 6>;
-
-  //! Failure state
-  enum FailureState { Elastic = 0, Tensile = 1, Shear = 2 };
 
   //! Constructor with id and material properties
   //! \param[in] material_properties Material properties
@@ -70,8 +72,9 @@ class MohrCoulomb : public Material<Tdim> {
   //! Compute yield function and yield state
   //! \param[in] state_vars History-dependent state variables
   //! \retval yield_type Yield type (elastic, shear or tensile)
-  FailureState compute_yield_state(Eigen::Matrix<double, 2, 1>* yield_function,
-                                   const mpm::dense_map* state_vars);
+  mpm::mohrcoulomb::FailureState compute_yield_state(
+      Eigen::Matrix<double, 2, 1>* yield_function,
+      const mpm::dense_map& state_vars);
 
   //! Compute dF/dSigma and dP/dSigma
   //! \param[in] yield_type Yield type (elastic, shear or tensile)
@@ -80,9 +83,10 @@ class MohrCoulomb : public Material<Tdim> {
   //! \param[in] df_dsigma dF/dSigma
   //! \param[in] dp_dsigma dP/dSigma
   //! \param[in] softening Softening parameter
-  void compute_df_dp(FailureState yield_type, const mpm::dense_map* state_vars,
-                     const Vector6d& stress, Vector6d* df_dsigma,
-                     Vector6d* dp_dsigma, double* softening);
+  void compute_df_dp(mpm::mohrcoulomb::FailureState yield_type,
+                     const mpm::dense_map* state_vars, const Vector6d& stress,
+                     Vector6d* df_dsigma, Vector6d* dp_dsigma,
+                     double* softening);
 
  protected:
   //! material id
@@ -126,8 +130,6 @@ class MohrCoulomb : public Material<Tdim> {
   double epds_residual_{std::numeric_limits<double>::max()};
   //! Tension cutoff
   double tension_cutoff_{std::numeric_limits<double>::max()};
-  //! Tolerance of yield function
-  double tolerance_{std::numeric_limits<double>::max()};
   //! softening
   bool softening_{false};
 };  // MohrCoulomb class
