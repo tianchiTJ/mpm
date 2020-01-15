@@ -77,6 +77,12 @@ class CamClay : public Material<Tdim> {
   //! \param[in] state_vars History-dependent state variables
   void compute_bonding_parameters(const double chi, mpm::dense_map* state_vars);
 
+  //! Compute subloading parameters
+  //! \param[in] subloading_r Subloading ratio
+  //! \param[in] state_vars History-dependent state variables
+  void compute_subloading_parameters(const double subloading_r,
+                                     mpm::dense_map* state_vars);
+
   //! Compute dF/dmul
   //! \param[in] state_vars History-dependent state variables
   //! \param[in] df_dmul dF / ddelta_phi
@@ -156,8 +162,8 @@ class CamClay : public Material<Tdim> {
   //! Subloading surface properties
   //! Subloading status
   bool subloading_{false};
-  //! Subloading surface ratio
-  double subloading_r_{1.};
+  //! Material constant controling plastic deformation
+  double subloading_u_{std::numeric_limits<double>::epsilon()};
   //! Bonding properties
   //! Bonding status
   bool bonding_{false};

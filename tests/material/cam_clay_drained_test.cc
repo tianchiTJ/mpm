@@ -1,3 +1,4 @@
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <limits>
 #include <vector>
@@ -15,12 +16,17 @@
 using Json = nlohmann::json;
 
 //! Check drained condition with bonding for hardening in 3D
-TEST_CASE("drained condition hardening is checked in 3D",
+TEST_CASE("drained condition with bonding hardening is checked in 3D",
           "[material][cam_clay][3D]") {
   // Tolerance
   const double Tolerance = 1.E-7;
   // Dimension
   const unsigned Dim = 3;
+
+  // Create results folder if not present
+  boost::filesystem::path dir("./Exxon_data/BMCC_results");
+  if (!boost::filesystem::exists(dir)) boost::filesystem::create_directory(dir);
+
   /*
   // Incremental axial stress
   const double dstrain_axial = -1.E-5;
@@ -126,6 +132,7 @@ TEST_CASE("drained condition hardening is checked in 3D",
     jmaterial["mc_d"] = json_["mc_d"];
     jmaterial["m_degradation"] = json_["m_degradation"];
     jmaterial["m_shear"] = json_["m_shear"];
+    jmaterial["subloading"] = false;
     // Material id
     unsigned id = 0;
     // Create material
@@ -154,11 +161,14 @@ TEST_CASE("drained condition hardening is checked in 3D",
     stress.setZero();
     // Define the output files
     std::ofstream fPc, fStrain, fStress, fVoid;
-    fPc.open("MCC_bonded_drained_pc_pcc_pcd_" + std::to_string(j + 1) + ".txt");
-    fStrain.open("MCC_bonded_drained_strain_" + std::to_string(j + 1) + ".txt");
-    fStress.open("MCC_bonded_drained_p_q_" + std::to_string(j + 1) + ".txt");
-    fVoid.open("MCC_bonded_drained_void_ratio_" + std::to_string(j + 1) +
-               ".txt");
+    fPc.open("./Exxon_data/BMCC_results/MCC_bonded_drained_pc_pcc_pcd_" +
+             std::to_string(j + 1) + ".txt");
+    fStrain.open("./Exxon_data/BMCC_results/MCC_bonded_drained_strain_" +
+                 std::to_string(j + 1) + ".txt");
+    fStress.open("./Exxon_data/BMCC_results/MCC_bonded_drained_p_q_" +
+                 std::to_string(j + 1) + ".txt");
+    fVoid.open("./Exxon_data/BMCC_results/MCC_bonded_drained_void_ratio_" +
+               std::to_string(j + 1) + ".txt");
     stress(0) = stress(1) = stress(2) = -confining_p;
     // Compute stress invariants
     mpm::dense_map state_vars = material->initialise_state_variables();
@@ -247,6 +257,211 @@ TEST_CASE("drained condition hardening is checked in 3D",
                 << state_vars.at("dpdstrain") << "\n";
         fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
         fVoid << state_vars.at("void_ratio") << "\n";
+      }
+    }
+    fPc.close();
+    fStrain.close();
+    fStress.close();
+    fVoid.close();
+  }
+}
+
+//! Check drained condition with bonding && subloading for hardening in 3D
+TEST_CASE(
+    "drained condition with bonding && subloading hardening is checked in 3D",
+    "[material][cam_clay][3D]") {
+  // Tolerance
+  const double Tolerance = 1.E-7;
+  // Dimension
+  const unsigned Dim = 3;
+
+  // Create results folder if not present
+  boost::filesystem::path dir("./Exxon_data/BMCC_subloading_results");
+  if (!boost::filesystem::exists(dir)) boost::filesystem::create_directory(dir);
+
+  // Input file
+  std::ifstream input_file;
+  input_file.open("./Exxon_data/BMCC-parameters.json");
+  // JSON object
+  Json json_ = Json::parse(input_file);
+  // Incremental axial stress
+  const double dstrain_axial = json_["dstrain_axial"];
+  // Number of steps
+  const unsigned long long nsteps = json_["nsteps"];
+  // Interval of output step;
+  const unsigned output_steps = json_["output_steps"];
+  // Confining pressure
+  double confining_p0 = json_["confining_p"];
+  confining_p0 *= 6894.75729;
+  // Confining pressure multipliers
+  const std::vector<double> multipliers = json_["multipliers"];
+  // Initial void ratio
+  const double e0 = json_["e0"];
+  // Lambda
+  const double lambda = json_["lambda"];
+  // Kappa
+  const double kappa = json_["kappa"];
+  // pc0
+  const double pc0 = json_["pc0"];
+
+  // Iterate over multipliers
+  for (int j = 0; j < multipliers.size(); ++j) {
+    // Confining pressure
+    const double confining_p = confining_p0 * multipliers[j];
+    // Add particle
+    mpm::Index pid = 0;
+    Eigen::Matrix<double, Dim, 1> coords;
+    coords.setZero();
+    auto particle = std::make_shared<mpm::Particle<Dim, 1>>(pid, coords);
+    // Initialise material
+    Json jmaterial;
+    jmaterial["density"] = json_["density"];
+    jmaterial["youngs_modulus"] = json_["youngs_modulus"];
+    jmaterial["poisson_ratio"] = json_["poisson_ratio"];
+    jmaterial["pc0"] = pc0;
+    jmaterial["m"] = json_["m"];
+    jmaterial["lambda"] = lambda;
+    jmaterial["kappa"] = kappa;
+    jmaterial["e0"] = e0;
+    jmaterial["three_invariants"] = json_["three_invariants"];
+    // Subloading
+    jmaterial["subloading"] = json_["subloading"];
+    jmaterial["subloading_r"] = json_["subloading_r"];
+    jmaterial["subloading_u"] = json_["subloading_u"];
+    // Bonding parameters
+    jmaterial["bonding"] = json_["bonding"];
+    jmaterial["s_h"] = json_["s_h"];
+    jmaterial["mc_a"] = json_["mc_a"];
+    jmaterial["mc_b"] = json_["mc_b"];
+    jmaterial["mc_c"] = json_["mc_c"];
+    jmaterial["mc_d"] = json_["mc_d"];
+    jmaterial["m_degradation"] = json_["m_degradation"];
+    jmaterial["m_shear"] = json_["m_shear"];
+    // Material id
+    unsigned id = 0;
+    // Create material
+    auto material =
+        Factory<mpm::Material<Dim>, unsigned, const Json&>::instance()->create(
+            "CamClay3D", std::move(id), jmaterial);
+    // Pointer of the MCC
+    auto cam_clay = std::make_shared<mpm::CamClay<Dim>>(id, jmaterial);
+    // Initialise dstrain
+    mpm::Material<Dim>::Vector6d dstrain;
+    dstrain.setZero();
+    // Initialise dpstrain
+    mpm::Material<Dim>::Vector6d dpstrain;
+    dpstrain.setZero();
+    // Initialise dstress
+    mpm::Material<Dim>::Vector6d dstress;
+    dstress.setZero();
+    // Initialise strain
+    mpm::Material<Dim>::Vector6d strain;
+    mpm::Material<Dim>::Vector6d pstrain;
+    strain.setZero();
+    pstrain.setZero();
+    // Initialise stress
+    mpm::Material<Dim>::Vector6d stress;
+    // Initial stress status
+    stress.setZero();
+    // Define the output files
+    std::ofstream fPc, fStrain, fStress, fVoid, fRatio;
+    fPc.open(
+        "./Exxon_data/BMCC_subloading_results/"
+        "MCC_bonded_subloading_drained_pc_pcc_pcd_" +
+        std::to_string(j + 1) + ".txt");
+    fStrain.open(
+        "./Exxon_data/BMCC_subloading_results/"
+        "MCC_bonded_subloading_drained_strain_" +
+        std::to_string(j + 1) + ".txt");
+    fStress.open(
+        "./Exxon_data/BMCC_subloading_results/"
+        "MCC_bonded_subloading_drained_p_q_" +
+        std::to_string(j + 1) + ".txt");
+    fVoid.open(
+        "./Exxon_data/BMCC_subloading_results/"
+        "MCC_bonded_subloading_drained_void_ratio_" +
+        std::to_string(j + 1) + ".txt");
+    fRatio.open(
+        "./Exxon_data/BMCC_subloading_results/"
+        "MCC_bonded_subloading_drained_r_ratio_" +
+        std::to_string(j + 1) + ".txt");
+    stress(0) = stress(1) = stress(2) = -confining_p;
+    // Compute stress invariants
+    mpm::dense_map state_vars = material->initialise_state_variables();
+    // Initialise vector n
+    mpm::Material<Dim>::Vector6d n;
+    n.setZero();
+    // Compute stress invariants
+    cam_clay->compute_stress_invariants(stress, n, &state_vars);
+    // Initialise chi
+    double chi = 1.;
+    // Compute initial bonding parameters
+    cam_clay->compute_bonding_parameters(chi, &state_vars);
+    // Initialise subloading_r
+    state_vars.at("subloading_r") =
+        state_vars.at("p") /
+        (state_vars.at("pc") + state_vars.at("pcd") + state_vars.at("pcc"));
+    double subloading_r = state_vars.at("subloading_r");
+    // Computation loop
+    for (int i = 0; i < nsteps; ++i) {
+      // Compute stress invariants
+      cam_clay->compute_stress_invariants(stress, n, &state_vars);
+      // Compute elastic tensor
+      cam_clay->compute_elastic_tensor(&state_vars);
+      // Compute plastic stiffness
+      cam_clay->compute_plastic_tensor(stress, &state_vars);
+      // Compute dstrain
+      dstrain(0) = dstrain(1) = -(cam_clay->de() - cam_clay->dp())(0, 2) *
+                                dstrain_axial /
+                                ((cam_clay->de() - cam_clay->dp())(0, 0) +
+                                 (cam_clay->de() - cam_clay->dp())(0, 1));
+      dstrain(2) = dstrain_axial;
+      // Compute dstress_axial
+      dstress(2) = ((cam_clay->de() - cam_clay->dp())(2, 0) +
+                    (cam_clay->de() - cam_clay->dp())(2, 1)) *
+                       dstrain(0) +
+                   (cam_clay->de() - cam_clay->dp())(2, 2) * dstrain_axial;
+      // Compute dpstrain
+      dpstrain = dstrain - cam_clay->de().inverse() * dstress;
+      // Compute pstrain
+      pstrain += dpstrain;
+      // Compute plastic volumetrix strain
+      state_vars.at("dpvstrain") = (dpstrain(0) + dpstrain(1) + dpstrain(2));
+      // Compute plastic deviatoric strain
+      state_vars.at("dpdstrain") = 2. / 3. *
+                                   sqrt(pow((dpstrain(0) - dpstrain(1)), 2) +
+                                        pow((dpstrain(0) - dpstrain(2)), 2) +
+                                        pow((dpstrain(2) - dpstrain(1)), 2));
+      // Update pc
+      state_vars.at("pc") *=
+          exp(-state_vars.at("dpvstrain") * (1 + state_vars.at("void_ratio")) /
+              (material->property("lambda") - material->property("kappa")));
+      // Record chi at last step
+      chi = state_vars.at("chi");
+      // Update pcc and pcd
+      cam_clay->compute_bonding_parameters(chi, &state_vars);
+      // Record subloading_r at last step
+      subloading_r = state_vars.at("subloading_r");
+      // Update subloading parameter
+      cam_clay->compute_subloading_parameters(subloading_r, &state_vars);
+
+      // Compute strain
+      strain += dstrain;
+      // Update void ratio
+      state_vars.at("void_ratio") +=
+          ((dstrain(0) + dstrain(1) + dstrain(2)) * (1 + e0));
+      // Compute stress
+      stress += dstress;
+      // Write output
+      if (i % output_steps == 0) {
+        fPc << state_vars.at("pc") << "\t" << state_vars.at("pcc") << "\t"
+            << state_vars.at("pcd") << "\n";
+        fStrain << strain(0) << "\t" << strain(1) << "\t" << strain(2) << "\t"
+                << state_vars.at("dpvstrain") << "\t"
+                << state_vars.at("dpdstrain") << "\n";
+        fStress << state_vars.at("p") << "\t" << state_vars.at("q") << "\n";
+        fVoid << state_vars.at("void_ratio") << "\n";
+        fRatio << state_vars.at("subloading_r") << "\n";
       }
     }
     fPc.close();

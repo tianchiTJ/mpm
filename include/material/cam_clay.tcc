@@ -33,9 +33,11 @@ mpm::CamClay<Tdim>::CamClay(unsigned id, const Json& material_properties)
     // Subloading status
     subloading_ = material_properties["subloading"].template get<bool>();
     // Subloading surface ratio
-    if (subloading_)
-      subloading_r_ =
-          material_properties["subloading_r"].template get<double>();
+    if (subloading_) {
+      // Material constant controling plastic deformation
+      subloading_u_ =
+          material_properties["subloading_u"].template get<double>();
+    }
     // Bonding properties
     // Bonding status
     bonding_ = material_properties["bonding"].template get<bool>();
@@ -105,22 +107,22 @@ mpm::dense_map mpm::CamClay<Tdim>::initialise_state_variables() {
       // Pcc
       {"pcc", 0.},
       // Subloading surface ratio
-      {"subloading_r", 0.}};
+      {"subloading_r", 1.}};
   return state_vars;
 }
 
 //! Compute elastic tensor
 template <unsigned Tdim>
 bool mpm::CamClay<Tdim>::compute_elastic_tensor(mpm::dense_map* state_vars) {
-  if ((*state_vars).at("p") > 0) {
-    // Bulk modulus
-    (*state_vars).at("bulk_modulus") =
-        (1 + (*state_vars).at("void_ratio")) / kappa_ * (*state_vars).at("p");
-    // Shear modulus
-    (*state_vars).at("shear_modulus") = 3 * (*state_vars).at("bulk_modulus") *
-                                        (1 - 2 * poisson_ratio_) /
-                                        (2 * (1 + poisson_ratio_));
-  }
+  // if ((*state_vars).at("p") > 0) {
+  //  // Bulk modulus
+  //  (*state_vars).at("bulk_modulus") =
+  //      (1 + (*state_vars).at("void_ratio")) / kappa_ * (*state_vars).at("p");
+  //  // Shear modulus
+  //  (*state_vars).at("shear_modulus") = 3 * (*state_vars).at("bulk_modulus") *
+  //                                      (1 - 2 * poisson_ratio_) /
+  //                                      (2 * (1 + poisson_ratio_));
+  //}
   if (bonding_)
     (*state_vars).at("shear_modulus") +=
         m_shear_ * (*state_vars).at("chi") * s_h_;
@@ -151,16 +153,24 @@ bool mpm::CamClay<Tdim>::compute_plastic_tensor(const Vector6d& stress,
   // Bonding parameters
   const double pcc = (*state_vars).at("pcc");
   const double pcd = (*state_vars).at("pcd");
+  // Subloading ratio
+  const double subloading_r = (*state_vars).at("subloading_r");
   // Compute dF / dp
-  const double df_dp = 2 * p - pc - pcd;
+  double df_dp = 2 * p - pc - pcd;
   // Compute dF / dq
   const double df_dq = 2 * q / pow((*state_vars).at("m_theta"), 2);
   // Compute dF / dpc
-  const double df_dpc = -p - pcc;
+  double df_dpc = -p - pcc;
   // Compute dF / dpcd
-  const double df_dpcd = -p - pcc;
+  double df_dpcd = -p - pcc;
   // Compute dF / dpcc
-  const double df_dpcc = -2 * pcc - pc - pcd;
+  double df_dpcc = -2 * pcc - pc - pcd;
+  if (subloading_) {
+    df_dp = 2 * p + pcc - subloading_r * (pc + pcc + pcd);
+    df_dpc *= subloading_r;
+    df_dpcd *= subloading_r;
+    df_dpcc = p - subloading_r * (p + pc + pcd + 2 * pcc);
+  }
   // Upsilon
   const double upsilon =
       (1 + (*state_vars).at("void_ratio")) / (lambda_ - kappa_);
@@ -186,6 +196,18 @@ bool mpm::CamClay<Tdim>::compute_plastic_tensor(const Vector6d& stress,
     // Update hardening parameter
     hardening += (hardening_pcd + hardening_pcc);
   }
+  // Compute subloading
+  if (subloading_) {
+    // Compute dF / dR
+    const double df_dr = -(p + pcc) * (pc + pcd + pcc);
+    // Compute subloading hardening parameter
+    const double hardening_subloading =
+        -df_dr * subloading_u_ * (1 + (pcd + pcc) / pc) * log(subloading_r) *
+        sqrt(std::pow((*state_vars).at("dpvstrain"), 2) +
+             std::pow((*state_vars).at("dpdstrain"), 2));
+    // Update hardening parameter
+    hardening += hardening_subloading;
+  }
   // Compute the deviatoric stress
   Vector6d dev_stress = Vector6d::Zero();
   dev_stress(0) = stress(0) + p;
@@ -202,22 +224,24 @@ bool mpm::CamClay<Tdim>::compute_plastic_tensor(const Vector6d& stress,
   Matrix6x6 n_n = Matrix6x6::Zero();
   double xi = q / sqrt(1.5);
   // lxn
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 6; ++j) l_n(i, j) = dev_stress(j) / xi;
-  }
-  // nxl
-  for (int i = 0; i < 6; ++i) {
-    for (int j = 0; j < 3; ++j) n_l(i, j) = dev_stress(i) / xi;
-  }
-  // nxn
-  for (int i = 0; i < 6; ++i) {
-    for (int j = 0; j < 6; ++j) {
-      n_n(i, j) = dev_stress(i) * dev_stress(j) / (xi * xi);
+  if (xi > std::numeric_limits<double>::epsilon()) {
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 6; ++j) l_n(i, j) = dev_stress(j) / xi;
     }
-  }
-  // lxl
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) l_l(i, j) = 1;
+    // nxl
+    for (int i = 0; i < 6; ++i) {
+      for (int j = 0; j < 3; ++j) n_l(i, j) = dev_stress(i) / xi;
+    }
+    // nxn
+    for (int i = 0; i < 6; ++i) {
+      for (int j = 0; j < 6; ++j) {
+        n_n(i, j) = dev_stress(i) * dev_stress(j) / (xi * xi);
+      }
+    }
+    // lxl
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) l_l(i, j) = 1;
+    }
   }
   // Compute plastic tensor
   this->dp_ = (a1 * l_l + a2 * (n_l + l_n) + a3 * (n_n)) / (num - hardening);
@@ -321,6 +345,33 @@ void mpm::CamClay<Tdim>::compute_bonding_parameters(
   (*state_vars).at("pcd") = mc_a_ * pow((*state_vars).at("chi") * s_h_, mc_b_);
   // Compute pcc
   (*state_vars).at("pcc") = mc_c_ * pow((*state_vars).at("chi") * s_h_, mc_d_);
+}
+
+//! Compute subloading parameters
+template <unsigned Tdim>
+void mpm::CamClay<Tdim>::compute_subloading_parameters(
+    const double subloading_r, mpm::dense_map* state_vars) {
+  const double p = (*state_vars).at("p");
+  // Preconsolidation pressure
+  const double pc = (*state_vars).at("pc");
+  // Get bonding parameters
+  const double pcd = (*state_vars).at("pcd");
+  const double pcc = (*state_vars).at("pcc");
+  // Plastic strain
+  const double dpvstrain = (*state_vars).at("dpvstrain");
+  const double dpdstrain = (*state_vars).at("dpdstrain");
+  // Update subloading surface ratio
+  //(*state_vars).at("subloading_r") =
+  //    subloading_r -
+  //    subloading_u_ * (1 + (pcd + pcc) / pc) * log(subloading_r) *
+  //        std::sqrt(dpvstrain * dpvstrain + dpdstrain * dpdstrain);
+
+  (*state_vars).at("subloading_r") = p / (pc + pcd + pcc);
+
+  if ((*state_vars).at("subloading_r") < std::numeric_limits<double>::epsilon())
+    (*state_vars).at("subloading_r") = 1.E-5;
+  if ((*state_vars).at("subloading_r") > 1.)
+    (*state_vars).at("subloading_r") = 1.;
 }
 
 //! Compute dF/dmul
