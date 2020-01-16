@@ -40,7 +40,7 @@ triaxial_data = 15
 # Path_16_x
 path_16 = ["" for i in range(triaxial_data)]
 for i in range(triaxial_data):
-    path_16[i] = "./16-"+str(i+1)+".txt"
+    path_16[i] = "./Exxon_data/16-"+str(i+1)+".txt"
 # Number of simulation cases
 simulation_data = 5
 # path_simulation_x
