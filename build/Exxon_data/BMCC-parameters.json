@@ -1,0 +1,32 @@
+{
+    "dstrain_axial": -1E-5,
+    "nsteps": 200000,
+    "output_steps": 100,
+    "confining_p": 500,
+    "multipliers": [
+        1,
+        2,
+        5,
+        10,
+        16
+    ],
+    "e0": 0.38,
+    "lambda": 0.2,
+    "kappa": 0.02,
+    "density": 2000,
+    "youngs_modulus": 5E9,
+    "poisson_ratio": 0.17,
+    "m": 1.5,
+    "three_invariants": false,
+    "bonding": true,
+    "s_h": 1,
+    "mc_a": 3E7,
+    "mc_b": 1,
+    "mc_c": 0,
+    "mc_d": 10,
+    "pc0": 1E8,
+    "m_degradation": 1,
+    "m_shear": 0,
+    "subloading": true,
+    "subloading_u": 30
+}
