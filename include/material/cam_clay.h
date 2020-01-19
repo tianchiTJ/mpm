@@ -140,13 +140,13 @@ class CamClay : public Material<Tdim> {
   double youngs_modulus_{std::numeric_limits<double>::max()};
   //! Poisson ratio
   double poisson_ratio_{std::numeric_limits<double>::max()};
-  //! Initial void_ratio
-  double e0_{std::numeric_limits<double>::max()};
   //! Cam Clay parameters
   //! Reference mean pressure
   double p_ref_{std::numeric_limits<double>::max()};
   //! Reference void ratio
   double e_ref_{std::numeric_limits<double>::max()};
+  //! Initial void ratio
+  double e0_{std::numeric_limits<double>::max()};
   //! Initial preconsolidation pressure
   double pc0_{std::numeric_limits<double>::max()};
   //! OCR

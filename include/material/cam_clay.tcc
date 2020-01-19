@@ -17,7 +17,11 @@ mpm::CamClay<Tdim>::CamClay(unsigned id, const Json& material_properties)
     properties_ = material_properties;
     // Cam Clay parameters
     // Reference void ratio
-    e0_ = material_properties["e0"].template get<double>();
+    e_ref_ = material_properties["e_ref"].template get<double>();
+    // Reference stress
+    p_ref_ = material_properties["p_ref"].template get<double>();
+    // OCR
+    ocr_ = material_properties["ocr"].template get<double>();
     // Initial preconsolidation pressure
     pc0_ = material_properties["pc0"].template get<double>();
     // M (or triaxial compression M (Mtc) in "Three invariants type")
@@ -26,6 +30,8 @@ mpm::CamClay<Tdim>::CamClay(unsigned id, const Json& material_properties)
     lambda_ = material_properties["lambda"].template get<double>();
     // Kappa
     kappa_ = material_properties["kappa"].template get<double>();
+    // e0
+    e0_ = e_ref_ - lambda_ * log(pc0_ / ocr_ / p_ref_) - kappa_ * log(ocr_);
     // Three invariants
     three_invariants_ =
         material_properties["three_invariants"].template get<bool>();
@@ -360,14 +366,14 @@ void mpm::CamClay<Tdim>::compute_subloading_parameters(
   // Plastic strain
   const double dpvstrain = (*state_vars).at("dpvstrain");
   const double dpdstrain = (*state_vars).at("dpdstrain");
-  // Update subloading surface ratio
-  //(*state_vars).at("subloading_r") =
-  //    subloading_r -
-  //    subloading_u_ * (1 + (pcd + pcc) / pc) * log(subloading_r) *
-  //        std::sqrt(dpvstrain * dpvstrain + dpdstrain * dpdstrain);
-
-  (*state_vars).at("subloading_r") = p / (pc + pcd + pcc);
-
+  // Method 1: Update subloading surface ratio
+  (*state_vars).at("subloading_r") =
+      subloading_r -
+      subloading_u_ * (1 + (pcd + pcc) / pc) * log(subloading_r) *
+          std::sqrt(dpvstrain * dpvstrain + dpdstrain * dpdstrain);
+  // Method 2: Update
+  //(*state_vars).at("subloading_r") = p / (pc + pcd + pcc);
+  // Threshhold
   if ((*state_vars).at("subloading_r") < std::numeric_limits<double>::epsilon())
     (*state_vars).at("subloading_r") = 1.E-5;
   if ((*state_vars).at("subloading_r") > 1.)
@@ -465,15 +471,15 @@ void mpm::CamClay<Tdim>::compute_df_dsigma(const mpm::dense_map* state_vars,
                                            const Vector6d& stress,
                                            Vector6d* df_dsigma) {
   // Get stress invariants
-  const double& j3 = (*state_vars).at("j3");
-  const double& p = (*state_vars).at("p");
-  const double& q = (*state_vars).at("q");
-  const double& theta = (*state_vars).at("theta");
+  const double j3 = (*state_vars).at("j3");
+  const double p = (*state_vars).at("p");
+  const double q = (*state_vars).at("q");
+  const double theta = (*state_vars).at("theta");
   // Get MCC parameters
-  const double& m_theta = (*state_vars).at("m_theta");
-  const double& pc = (*state_vars).at("pc");
-  const double& pcc = (*state_vars).at("pcc");
-  const double& pcd = (*state_vars).at("pcd");
+  const double m_theta = (*state_vars).at("m_theta");
+  const double pc = (*state_vars).at("pc");
+  const double pcc = (*state_vars).at("pcc");
+  const double pcd = (*state_vars).at("pcd");
   // Compute deviatoric stress
   Vector6d dev_stress = Vector6d::Zero();
   dev_stress(0) = stress(0) + p;

@@ -82,7 +82,7 @@ n = 1000000
 # Critical line
 q_critical = [0]*n
 q_critical_bonded = [0]*n
-mul = 1.5
+mul = 1.2
 # Yield surface
 p_yield = [0]*n
 q_yield = [0]*n
@@ -121,6 +121,60 @@ labels = ax.get_xticklabels() + ax.get_yticklabels()
 #    # plot bonded critical lines
 #    plt.plot([i * mul for i in p_yield_bonded],
 #             q_critical_bonded, 'g-', alpha=0.1, label='bonded critical line')
+# pc pcc pcd
+for i in range(simulation_data):
+    p_simulation = np.loadtxt(
+        path_simulation_p_q[i], delimiter='\t', usecols=(0))
+    q_simulation = np.loadtxt(
+        path_simulation_p_q[i], delimiter='\t', usecols=(1))
+    pc_simulation = np.loadtxt(
+        path_simulation_pc[i], delimiter='\t', usecols=(0))
+    pcc_simulation = np.loadtxt(
+        path_simulation_pc[i], delimiter='\t', usecols=(1))
+    pcd_simulation = np.loadtxt(
+        path_simulation_pc[i], delimiter='\t', usecols=(2))
+    pc0 = pc_simulation[0]
+    pcc0 = pcc_simulation[0]
+    pcd0 = pcd_simulation[0]
+    # Set color
+    if (p_simulation[0] > (7000*psi_pa)):
+        c = colors[4]
+        marker = markers[4]
+        name = 'pconf = 8000Psi'
+    elif (p_simulation[0] > (4000*psi_pa)):
+        c = colors[3]
+        marker = markers[3]
+        name = 'pconf = 5000Psi'
+    elif (p_simulation[0] > (2300*psi_pa)):
+        c = colors[2]
+        marker = markers[2]
+        name = 'pconf = 2500Psi'
+    elif (p_simulation[0] > (800*psi_pa)):
+        c = colors[1]
+        marker = markers[1]
+        name = 'pconf = 1000Psi'
+    else:
+        c = colors[0]
+        marker = markers[0]
+        name = 'pconf = 500Psi'
+    for j in range(len(pc_simulation)):
+        if (pc_simulation[j]+pcc_simulation[j]+pcd_simulation[j]) > (pc0+pcc0+pcd0):
+            pc0 = pc_simulation[j]
+            pcc0 = pcc_simulation[j]
+            pcd0 = pcd_simulation[j]
+    # Plot bonded yield surface
+    for k in range(n):
+        p_yield_bonded[k] = (pc0+pcc0*2+pcd0) / n * k - pcc0
+        q_yield_bonded[k] = math.sqrt(-m*m*(p_yield_bonded[k]+pcc0)
+                                      * (p_yield_bonded[k]-pc0-pcd0-pcc0))
+        q_critical_bonded[k] = m*p_yield_bonded[k]*mul + pcc0
+
+    plt.plot(p_yield_bonded, q_yield_bonded, ':', color=c,
+             label='Bonded yield surface'+str(i+1)+", "+name)
+
+    # Plot simulation data
+    plt.plot(p_simulation, q_simulation, color=c,
+             alpha=1, label='BMCC Model'+str(i+1))
 
 # Plot yield surface
 plt.plot(p_yield, q_yield, 'k-', label='Yield surface')
@@ -129,9 +183,8 @@ for i in range(n):
     p_yield_bonded[i] = (pc0+pcc0*2+pcd0) / n * i - pcc0
     q_yield_bonded[i] = math.sqrt(-m*m*(p_yield_bonded[i]+pcc0)
                                   * (p_yield_bonded[i]-pc0-pcd0-pcc0))
-# Plot bonded yield surface
-plt.plot(p_yield_bonded, q_yield_bonded, 'b:', label='Bonded yield surface')
-l3 = plt.plot([i * mul for i in p_yield], q_critical, 'g-', label='D')
+# Plot critical line
+plt.plot([i * mul for i in p_yield], q_critical, linewidth=5, 'b-', label='Critical line')
 # plot p-q
 # Plot traxial test data
 for i in range(triaxial_data):
@@ -165,14 +218,6 @@ for i in range(triaxial_data):
     # plot data
     plt.scatter(p_16, q_16, color=c, s=20, marker=marker,
                 alpha=1, label='Traxial test data 16-'+str(i+1)+", "+name)
-# Plot simulation data
-for i in range(simulation_data):
-    p_simulation = np.loadtxt(
-        path_simulation_p_q[i], delimiter='\t', usecols=(0))
-    q_simulation = np.loadtxt(
-        path_simulation_p_q[i], delimiter='\t', usecols=(1))
-    plt.plot(p_simulation, q_simulation, 'k-',
-             alpha=0.5, label='BMCC Model'+str(i+1))
 
 legend = plt.legend(prop=font_legend)
 # axis label name
