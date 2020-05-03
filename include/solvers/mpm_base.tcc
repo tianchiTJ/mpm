@@ -79,6 +79,16 @@ mpm::MPMBase<Tdim>::MPMBase(const std::shared_ptr<IO>& io) : mpm::MPM(io) {
                      __LINE__, exception.what());
     }
 
+    // Remove step
+    try {
+      // Get remove step properties
+      auto remove_steps = io_->json_object("remove_step");
+      if (!remove_steps.empty()) this->initialise_remove_steps(remove_steps);
+    } catch (std::exception& exception) {
+      console_->warn("{} #{}: No remove steps are defined", __FILE__, __LINE__,
+                     exception.what());
+    }
+
     post_process_ = io_->post_processing();
     // Output steps
     output_steps_ = post_process_["output_steps"].template get<mpm::Index>();
@@ -1115,4 +1125,71 @@ void mpm::MPMBase<Tdim>::mpi_domain_decompose(bool initial_step) {
                        .count());
   }
 #endif  // MPI
+}
+
+//! Apply remove step
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::apply_remove_step(const mpm::Index rstep) {
+  bool status = false;
+  if (remove_steps_.find(rstep) != remove_steps_.end()) {
+    try {
+      // Iterate over each particle sets in the remove step
+      for (auto sid : remove_steps_.at(rstep)) mesh_->apply_remove_step(sid);
+    } catch (std::exception& exception) {
+      console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+      status = false;
+    }
+  }
+  return status;
+}
+
+//! Resume remove particles
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::resume_remove_particles(const mpm::Index resume_step) {
+  bool status = false;
+  // Iterate over each remove steps
+  for (auto rstep : remove_steps_) {
+    // Check remove steps before resume step
+    if (rstep.first <= resume_step) {
+      status = this->apply_remove_step(rstep.first);
+    }
+  }
+  return status;
+}
+
+//! Particle remove step
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::initialise_remove_steps(const Json& remove_steps) {
+  bool status = true;
+  try {
+    // Get remove steps properties
+    for (const auto& remove_props : remove_steps) {
+
+      // Get math function id
+      auto rstep = remove_props["rstep"].template get<mpm::Index>();
+
+      // Get function type
+      auto pset_id = remove_props["pset_id"].template get<unsigned>();
+
+      //! Initialse the set of particle sets ids
+      std::vector<unsigned> sids;
+      // Get the current remove step existing at "rstep"
+      if (remove_steps_.find(rstep) != remove_steps_.end()) {
+        // Get the set of particle sets ids
+        sids = remove_steps_.at(rstep);
+        // Delete the remove step existing at "rstep"
+        remove_steps_.erase(rstep);
+      }
+      // Add set id of particle set into the vector
+      sids.insert(sids.end(), pset_id);
+      // Update the current remove step existing at "rstep"
+      remove_steps_.insert(
+          std::pair<mpm::Index, std::vector<unsigned>>(rstep, sids));
+    }
+  } catch (std::exception& exception) {
+    console_->error("#{}: Reading math functions: {}", __LINE__,
+                    exception.what());
+    status = false;
+  }
+  return status;
 }

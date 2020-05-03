@@ -67,6 +67,15 @@ class MPM {
   //! Write HDF5 files
   virtual void write_hdf5(mpm::Index step, mpm::Index max_steps) = 0;
 
+  //! Apply remove step
+  virtual bool apply_remove_step(const mpm::Index rstep) = 0;
+
+  //! Resume remove particles
+  virtual bool resume_remove_particles(const mpm::Index rstep) = 0;
+
+  //! Initialise remove steps
+  virtual bool initialise_remove_steps(const Json& remove_steps) = 0;
+
 #ifdef USE_VTK
   //! Write VTK files
   virtual void write_vtk(mpm::Index step, mpm::Index max_steps) = 0;

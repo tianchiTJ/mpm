@@ -69,6 +69,19 @@ class MPMBase : public MPM {
   //! Checkpoint resume
   bool checkpoint_resume() override;
 
+  //! Apply remove step
+  //! \param[in] rstep Remove step
+  //! \retval remove_status Return the successful remove of particle sets
+  bool apply_remove_step(const mpm::Index rstep);
+
+  //! Initialise remove particles
+  //! \param[in] resume_step Resume step
+  //! \retval remove_status Return the successful remove of particle sets
+  bool resume_remove_particles(const mpm::Index rstep);
+
+  //! Initialise remove steps
+  bool initialise_remove_steps(const Json& remove_steps);
+
 #ifdef USE_VTK
   //! Write VTK files
   void write_vtk(mpm::Index step, mpm::Index max_steps) override;
@@ -198,6 +211,8 @@ class MPMBase : public MPM {
   double damping_factor_{0.};
   //! Locate particles
   bool locate_particles_{true};
+  //! Container of remove steps(remove step, number of particle sets)
+  tsl::robin_map<mpm::Index, std::vector<unsigned>> remove_steps_;
 
 #ifdef USE_GRAPH_PARTITIONING
   // graph pass the address of the container of cell
