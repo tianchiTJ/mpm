@@ -132,6 +132,9 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   // Main loop
   for (; step_ < nsteps_; ++step_) {
 
+    // Apply remove step
+    bool remove_status = this->apply_remove_step(step_);
+
     if (mpi_rank == 0) console_->info("Step: {} of {}.\n", step_, nsteps_);
 
     // Inject particles
