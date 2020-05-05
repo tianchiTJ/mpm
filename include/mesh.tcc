@@ -1901,3 +1901,29 @@ bool mpm::Mesh<Tdim>::apply_remove_step(const unsigned sid) {
   }
   return status;
 }
+
+//! Apply continuous remove step
+template <unsigned Tdim>
+bool mpm::Mesh<Tdim>::apply_continuous_remove_step(const double ex_depth) {
+  bool status = false;
+  try {
+    // Iterate over particles
+    for (auto pitr = particles_.cbegin(); pitr != particles_.cend(); ++pitr) {
+      // Get coordinates
+      auto coordinates = (*pitr)->coordinates();
+      // Check position
+      if (coordinates[remove_boundary_dir_] > ex_left_ &&
+          coordinates[remove_boundary_dir_] < ex_right_) {
+        if (coordinates[remove_dir_] > ex_depth) {
+          status = this->remove_particle_by_id((*pitr)->id());
+          --pitr;
+          if (!status) throw std::runtime_error("Removing particle is invalid");
+        }
+      }
+    }
+    status = true;
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+  }
+  return status;
+}

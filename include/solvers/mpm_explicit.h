@@ -73,6 +73,12 @@ class MPMExplicit : public MPMBase<Tdim> {
   using mpm::MPMBase<Tdim>::damping_factor_;
   //! Locate particles
   using mpm::MPMBase<Tdim>::locate_particles_;
+  //! Remove continuously
+  using mpm::MPMBase<Tdim>::remove_continuously_;
+  //! Remove step
+  using mpm::MPMBase<Tdim>::remove_step_;
+  //! Current continuous remove step
+  using mpm::MPMBase<Tdim>::current_remove_steps_;
 
  private:
   //! Pressure smoothing

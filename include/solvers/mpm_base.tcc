@@ -81,9 +81,12 @@ mpm::MPMBase<Tdim>::MPMBase(const std::shared_ptr<IO>& io) : mpm::MPM(io) {
 
     // Remove step
     try {
-      // Get remove step properties
-      auto remove_steps = io_->json_object("remove_step");
-      if (!remove_steps.empty()) this->initialise_remove_steps(remove_steps);
+      // Get remove steps properties
+      auto remove_steps = io_->json_object("remove_steps");
+      if (!remove_steps.empty()) {
+        this->remove_step_ = true;
+        this->initialise_remove_steps(remove_steps);
+      }
     } catch (std::exception& exception) {
       console_->warn("{} #{}: No remove steps are defined", __FILE__, __LINE__,
                      exception.what());
@@ -406,6 +409,9 @@ bool mpm::MPMBase<Tdim>::checkpoint_resume() {
     this->uuid_ = analysis_["resume"]["uuid"].template get<std::string>();
     // Get step
     this->step_ = analysis_["resume"]["step"].template get<mpm::Index>();
+
+    // Initialise remove particles
+    this->resume_remove_particles(step_);
 
     // Input particle h5 file for resume
     std::string attribute = "particles";
@@ -1143,15 +1149,47 @@ bool mpm::MPMBase<Tdim>::apply_remove_step(const mpm::Index rstep) {
   return status;
 }
 
+//! Apply continuous remove step
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::apply_continuous_remove_step(const mpm::Index rstep) {
+  bool status = false;
+  try {
+    if (rstep >= start_remove_steps_) {
+      if (continuous_remove_steps_.find(rstep) !=
+          continuous_remove_steps_.end()) {
+        // Update current_remove_steps
+        current_remove_steps_ = rstep;
+      }
+      // Iterate over each particle sets in the remove step
+      mesh_->apply_continuous_remove_step(
+          continuous_remove_steps_.at(current_remove_steps_));
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+
+  return status;
+}
+
 //! Resume remove particles
 template <unsigned Tdim>
 bool mpm::MPMBase<Tdim>::resume_remove_particles(const mpm::Index resume_step) {
   bool status = false;
   // Iterate over each remove steps
-  for (auto rstep : remove_steps_) {
-    // Check remove steps before resume step
-    if (rstep.first <= resume_step) {
-      status = this->apply_remove_step(rstep.first);
+  if (!remove_continuously_) {
+    for (auto rstep : remove_steps_) {
+      // Check remove steps before resume step
+      if (rstep.first <= resume_step) {
+        status = this->apply_remove_step(rstep.first);
+      }
+    }
+  } else {
+    for (auto rstep : remove_steps_) {
+      // Check remove steps before resume step
+      if (rstep.first <= resume_step) {
+        status = this->apply_continuous_remove_step(rstep.first);
+      }
     }
   }
   return status;
@@ -1162,30 +1200,62 @@ template <unsigned Tdim>
 bool mpm::MPMBase<Tdim>::initialise_remove_steps(const Json& remove_steps) {
   bool status = true;
   try {
-    // Get remove steps properties
-    for (const auto& remove_props : remove_steps) {
-
-      // Get math function id
-      auto rstep = remove_props["rstep"].template get<mpm::Index>();
-
-      // Get function type
-      auto pset_id = remove_props["pset_id"].template get<unsigned>();
-
-      //! Initialse the set of particle sets ids
-      std::vector<unsigned> sids;
-      // Get the current remove step existing at "rstep"
-      if (remove_steps_.find(rstep) != remove_steps_.end()) {
-        // Get the set of particle sets ids
-        sids = remove_steps_.at(rstep);
-        // Delete the remove step existing at "rstep"
-        remove_steps_.erase(rstep);
+    // Get remove type
+    remove_continuously_ =
+        remove_steps["remove_continuously"].template get<bool>();
+    // Discontinuous removing
+    if (!remove_continuously_) {
+      // Get remove steps properties
+      for (const auto& remove_props : remove_steps["remove_steps"]) {
+        // Get remove step
+        auto rstep = remove_props["rstep"].template get<mpm::Index>();
+        // Get function type
+        auto pset_id = remove_props["pset_id"].template get<unsigned>();
+        //! Initialse the set of particle sets ids
+        std::vector<unsigned> sids;
+        // Get the current remove step existing at "rstep"
+        if (remove_steps_.find(rstep) != remove_steps_.end()) {
+          // Get the set of particle sets ids
+          sids = remove_steps_.at(rstep);
+          // Delete the remove step existing at "rstep"
+          remove_steps_.erase(rstep);
+        }
+        // Add set id of particle set into the vector
+        sids.insert(sids.end(), pset_id);
+        // Update the current remove step existing at "rstep"
+        remove_steps_.insert(
+            std::pair<mpm::Index, std::vector<unsigned>>(rstep, sids));
       }
-      // Add set id of particle set into the vector
-      sids.insert(sids.end(), pset_id);
-      // Update the current remove step existing at "rstep"
-      remove_steps_.insert(
-          std::pair<mpm::Index, std::vector<unsigned>>(rstep, sids));
     }
+    // Continuous removing
+    else {
+      // Get excavation direction
+      auto ex_dir = remove_steps["ex_dir"].template get<unsigned>();
+      auto ex_boundary_dir =
+          remove_steps["ex_boundary_dir"].template get<unsigned>();
+      // Get left boundary
+      auto ex_left = remove_steps["ex_left"].template get<double>();
+      // Get right boundary
+      auto ex_right = remove_steps["ex_right"].template get<double>();
+      // Create continuous removing
+      mesh_->create_continuous_remove(ex_dir, ex_boundary_dir, ex_left,
+                                      ex_right);
+      // Get remove steps properties
+      for (const auto& remove_props : remove_steps["remove_steps"]) {
+        // Get remove step
+        auto rstep = remove_props["rstep"].template get<mpm::Index>();
+        // Get excavation depth
+        auto ex_depth = remove_props["ex_depth"].template get<double>();
+        // Create the continuous remove step existing at "rstep"
+        continuous_remove_steps_[rstep] = ex_depth;
+        // Update current remove steps
+        if (current_remove_steps_ > rstep) {
+          current_remove_steps_ = rstep;
+          start_remove_steps_ = rstep;
+        }
+      }
+    }
+
   } catch (std::exception& exception) {
     console_->error("#{}: Reading math functions: {}", __LINE__,
                     exception.what());

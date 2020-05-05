@@ -453,6 +453,18 @@ class Mesh {
   //! Apply remove step
   bool apply_remove_step(const unsigned sid);
 
+  //! Apply continuous remove step
+  bool apply_continuous_remove_step(const double ex_depth);
+
+  //! Create continuous remove
+  void create_continuous_remove(unsigned ex_dir, unsigned ex_boundary_dir,
+                                double ex_left, double ex_right) {
+    remove_dir_ = ex_dir;
+    remove_boundary_dir_ = ex_boundary_dir;
+    ex_left_ = ex_left;
+    ex_right_ = ex_right;
+  };
+
  private:
   // Read particles from file
   //! \param[in] pset_id Set ID of the particles
@@ -523,6 +535,15 @@ class Mesh {
   unsigned nhalo_nodes_{0};
   //! Maximum number of halo nodes
   unsigned ncomms_{0};
+  //! Remove direction
+  unsigned remove_dir_{1};
+  //! Remove boundary direction
+  unsigned remove_boundary_dir_{0};
+  //! Remove boundary
+  double ex_left_{0};
+  double ex_right_{0};
+
+  //! Remove
 };  // Mesh class
 }  // namespace mpm
 

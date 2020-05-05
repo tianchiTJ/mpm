@@ -7,7 +7,7 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
-
+#include <iostream>
 // MPI
 #ifdef USE_MPI
 #include "mpi.h"
@@ -73,6 +73,11 @@ class MPMBase : public MPM {
   //! \param[in] rstep Remove step
   //! \retval remove_status Return the successful remove of particle sets
   bool apply_remove_step(const mpm::Index rstep);
+
+  //! Apply continuous remove step
+  //! \param[in] rstep Remove step
+  //! \retval remove_status Return the successful remove of particle sets
+  bool apply_continuous_remove_step(const mpm::Index rstep);
 
   //! Initialise remove particles
   //! \param[in] resume_step Resume step
@@ -213,6 +218,16 @@ class MPMBase : public MPM {
   bool locate_particles_{true};
   //! Container of remove steps(remove step, number of particle sets)
   tsl::robin_map<mpm::Index, std::vector<unsigned>> remove_steps_;
+  //! Container of continuous remove steps(remove step, excavation depth)
+  tsl::robin_map<mpm::Index, double> continuous_remove_steps_;
+  //! Current continuous remove step
+  mpm::Index current_remove_steps_{std::numeric_limits<mpm::Index>::max()};
+  //! Remove start step
+  mpm::Index start_remove_steps_{0};
+  //! Remove continuously
+  bool remove_continuously_{false};
+  //! Remove step
+  bool remove_step_{false};
 
 #ifdef USE_GRAPH_PARTITIONING
   // graph pass the address of the container of cell
