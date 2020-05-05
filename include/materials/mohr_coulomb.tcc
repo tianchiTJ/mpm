@@ -70,7 +70,14 @@ mpm::dense_map mpm::MohrCoulomb<Tdim>::initialise_state_variables() {
                                // Theta
                                {"theta", 0.},
                                // Plastic deviatoric strain
-                               {"pdstrain", 0.}};
+                               {"pdstrain", 0.},
+                               // Plastic strain components
+                               {"plastic_strain0", 0.},
+                               {"plastic_strain1", 0.},
+                               {"plastic_strain2", 0.},
+                               {"plastic_strain3", 0.},
+                               {"plastic_strain4", 0.},
+                               {"plastic_strain5", 0.}};
   return state_vars;
 }
 
@@ -410,18 +417,18 @@ Eigen::Matrix<double, 6, 1> mpm::MohrCoulomb<Tdim>::compute_stress(
   // Initialise updated stress
   Vector6d updated_stress = trial_stress;
   // Initialise incremental of plastic deviatoric strain
-  double dpdstrain = 0.;
+  // double dpdstrain = 0.;
   // Correction stress based on stress
   if (fabs(yield) < Tolerance) {
     // Compute updated stress
     updated_stress -= (lambda * this->de_ * dp_dsigma);
     // Compute incremental of plastic deviatoric strain
-    dpdstrain = lambda * dp_dq;
+    // dpdstrain = lambda * dp_dq;
   } else {
     // Compute updated stress
     updated_stress -= (lambda_trial * this->de_ * dp_dsigma_trial);
     // Compute incremental of plastic deviatoric strain
-    dpdstrain = lambda_trial * dp_dq_trial;
+    // dpdstrain = lambda_trial * dp_dq_trial;
   }
 
   // Define the maximum iteration step
@@ -455,12 +462,36 @@ Eigen::Matrix<double, 6, 1> mpm::MohrCoulomb<Tdim>::compute_stress(
     // Correct stress back to the yield surface
     updated_stress -= (lambda_trial * this->de_ * dp_dsigma_trial);
     // Update incremental of plastic deviatoric strain
-    dpdstrain += lambda_trial * dp_dq_trial;
+    // dpdstrain += lambda_trial * dp_dq_trial;
   }
   // Compute stress invariants based on updated stress
   this->compute_stress_invariants(updated_stress, state_vars);
+
+  // Compute incremental plastic strain, still in tension positive
+  Vector6d dstress = updated_stress - stress;
+  Vector6d dpstrain = dstrain - (this->de_.inverse() * dstress);
+  if (Tdim == 2) dpstrain(4) = dpstrain(5) = 0.;
+  // Update plastic strain
+  (*state_vars).at("plastic_strain0") += dpstrain(0);
+  (*state_vars).at("plastic_strain1") += dpstrain(1);
+  (*state_vars).at("plastic_strain2") += dpstrain(2);
+  (*state_vars).at("plastic_strain3") += dpstrain(3);
+  (*state_vars).at("plastic_strain4") += dpstrain(4);
+  (*state_vars).at("plastic_strain5") += dpstrain(5);
+
+  Vector6d plastic_strain;
+  plastic_strain(0) = (*state_vars).at("plastic_strain0");
+  plastic_strain(1) = (*state_vars).at("plastic_strain1");
+  plastic_strain(2) = (*state_vars).at("plastic_strain2");
+  plastic_strain(3) = (*state_vars).at("plastic_strain3");
+  plastic_strain(4) = (*state_vars).at("plastic_strain4");
+  plastic_strain(5) = (*state_vars).at("plastic_strain5");
+
+  // Update equivalent plastic deviatoric strain
+  (*state_vars).at("pdstrain") = mpm::materials::pdstrain(plastic_strain);
+
   // Update plastic deviatoric strain
-  (*state_vars).at("pdstrain") += dpdstrain;
+  // (*state_vars).at("pdstrain") += dpdstrain;
 
   return updated_stress;
 }
