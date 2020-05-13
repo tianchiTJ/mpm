@@ -254,6 +254,11 @@ class Node : public NodeBase<Tdim> {
                        const Eigen::MatrixXd& property_value, unsigned mat_id,
                        unsigned nprops) noexcept override;
 
+  double effective_stress() override { return effective_pressure_; }
+
+  void update_effective_stress(
+      bool update, const double effective_pressure) noexcept override;
+
  private:
   //! Mutex
   std::mutex node_mutex_;
@@ -307,6 +312,8 @@ class Node : public NodeBase<Tdim> {
   std::unique_ptr<spdlog::logger> console_;
   //! MPI ranks
   std::set<unsigned> mpi_ranks_;
+  //! Effective pressure
+  double effective_pressure_;
 };  // Node class
 }  // namespace mpm
 

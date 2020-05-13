@@ -244,6 +244,11 @@ class NodeBase {
                                const Eigen::MatrixXd& property_value,
                                unsigned mat_id, unsigned nprops) noexcept = 0;
 
+  virtual double effective_stress() = 0;
+
+  virtual void update_effective_stress(
+      bool update, const double effective_stress) noexcept = 0;
+
 };  // NodeBase class
 }  // namespace mpm
 

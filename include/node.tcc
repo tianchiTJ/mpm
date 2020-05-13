@@ -33,6 +33,7 @@ void mpm::Node<Tdim, Tdof, Tnphases>::initialise() noexcept {
   acceleration_.setZero();
   status_ = false;
   material_ids_.clear();
+  effective_pressure_ = 0.;
 }
 
 //! Initialise shared pointer to nodal properties pool
@@ -539,4 +540,17 @@ void mpm::Node<Tdim, Tdof, Tnphases>::update_property(
   std::lock_guard<std::mutex> guard(node_mutex_);
   property_handle_->update_property(property, prop_id_, mat_id, property_value,
                                     nprops);
+}
+
+//! Update effective stress
+template <unsigned Tdim, unsigned Tdof, unsigned Tnphases>
+void mpm::Node<Tdim, Tdof, Tnphases>::update_effective_stress(
+    bool update, const double effective_pressure) noexcept {
+  // Decide to update or assign
+  const double factor = (update == true) ? 1. : 0.;
+
+  // Update/assign effective stress
+  std::lock_guard<std::mutex> guard(node_mutex_);
+  effective_pressure_ =
+      effective_pressure / mass_(0) + effective_pressure_ * factor;
 }

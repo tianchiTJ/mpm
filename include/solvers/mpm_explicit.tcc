@@ -47,7 +47,7 @@ void mpm::MPMExplicit<Tdim>::compute_stress_strain(unsigned phase) {
       &mpm::ParticleBase<Tdim>::update_volume, std::placeholders::_1));
 
   // Pressure smoothing
-  if (pressure_smoothing_) this->pressure_smoothing(phase);
+  if (stress_smoothing_) this->pressure_smoothing(phase);
 
   // Iterate over each particle to compute stress
   mesh_->iterate_over_particles(std::bind(
@@ -82,8 +82,17 @@ bool mpm::MPMExplicit<Tdim>::solve() {
 
   // Pressure smoothing
   if (analysis_.find("pressure_smoothing") != analysis_.end())
-    pressure_smoothing_ =
-        analysis_.at("pressure_smoothing").template get<bool>();
+    stress_smoothing_ = analysis_.at("pressure_smoothing").template get<bool>();
+
+  // Stress smoothing
+  bool stress_smoothing = false;
+  if (analysis_.find("stress_smoothing") != analysis_.end()) {
+    stress_smoothing =
+        analysis_["stress_smoothing"]["stress_smoothing"].template get<bool>();
+    smoothing_coefficient =
+        analysis_["stress_smoothing"]["smoothing_coefficient"]
+            .template get<double>();
+  }
 
   // Interface
   if (analysis_.find("interface") != analysis_.end())
@@ -132,6 +141,11 @@ bool mpm::MPMExplicit<Tdim>::solve() {
   // Main loop
   for (; step_ < nsteps_; ++step_) {
 
+    if (mpi_rank == 0) console_->info("Step: {} of {}.\n", step_, nsteps_);
+
+    // Inject particles
+    mesh_->inject_particles(this->step_ * this->dt_);
+
     // Apply remove step
     if (remove_step_) {
       if (!remove_continuously_)
@@ -139,10 +153,6 @@ bool mpm::MPMExplicit<Tdim>::solve() {
       else
         bool remove_status = this->apply_continuous_remove_step(step_);
     }
-    if (mpi_rank == 0) console_->info("Step: {} of {}.\n", step_, nsteps_);
-
-    // Inject particles
-    mesh_->inject_particles(this->step_ * this->dt_);
 
     // Create a TBB task group
     tbb::task_group task_group;
@@ -274,6 +284,17 @@ bool mpm::MPMExplicit<Tdim>::solve() {
     // Update Stress Last
     if (this->stress_update_ == mpm::StressUpdate::USL)
       this->compute_stress_strain(phase);
+
+    // Stress smoothing
+    if (stress_smoothing) {
+      mesh_->iterate_over_particles(
+          std::bind(&mpm::ParticleBase<Tdim>::map_effective_stress,
+                    std::placeholders::_1, smoothing_coefficient));
+
+      mesh_->iterate_over_particles(std::bind(
+          &mpm::ParticleBase<Tdim>::compute_effective_stress_smoothing,
+          std::placeholders::_1, smoothing_coefficient));
+    }
 
     // Locate particles
     auto unlocatable_particles = mesh_->locate_particles_mesh();

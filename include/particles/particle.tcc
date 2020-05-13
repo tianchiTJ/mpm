@@ -817,3 +817,44 @@ void mpm::Particle<Tdim>::assign_neighbours(
   neighbours_.erase(std::remove(neighbours_.begin(), neighbours_.end(), id_),
                     neighbours_.end());
 }
+
+//! Map effective stress
+template <unsigned Tdim>
+void mpm::Particle<Tdim>::map_effective_stress(
+    const double smoothing_coefficient) {
+  // Compute effective pressure
+  double mean_p =
+      1. / 3. * smoothing_coefficient * (stress_(0) + stress_(1) + stress_(2));
+  // Compute nodal body forces
+  for (unsigned i = 0; i < nodes_.size(); ++i)
+    nodes_[i]->update_effective_stress(true, shapefn_[i] * mass_ * mean_p);
+}
+
+template <unsigned Tdim>
+bool mpm::Particle<Tdim>::compute_effective_stress_smoothing(
+    const double smoothing_coefficient) {
+  // Assert
+  assert(cell_ != nullptr);
+
+  bool status = false;
+  if (cell_ != nullptr) {
+    // Eigen::Matrix<double, 6, 1> effective_stress;
+    // effective_stress.setZero();
+    double effective_pressure = 0;
+    // Update particle effective stress to interpolated nodal effective stress
+    for (unsigned i = 0; i < this->nodes_.size(); ++i)
+      effective_pressure += shapefn_[i] * nodes_[i]->effective_stress();
+    // Compute effective pressure
+    double mean_p = 1. / 3. * smoothing_coefficient *
+                    (stress_(0) + stress_(1) + stress_(2));
+    this->stress_(0) -= mean_p;
+    this->stress_(1) -= mean_p;
+    this->stress_(2) -= mean_p;
+    this->stress_(0) += effective_pressure;
+    this->stress_(1) += effective_pressure;
+    this->stress_(2) += effective_pressure;
+
+    status = true;
+  }
+  return status;
+}

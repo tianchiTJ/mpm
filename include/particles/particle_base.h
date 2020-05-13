@@ -253,6 +253,11 @@ class ParticleBase {
   //! Return neighbour ids
   virtual std::vector<mpm::Index> neighbours() const = 0;
 
+  virtual void map_effective_stress(const double smoothing_coefficient) = 0;
+
+  virtual bool compute_effective_stress_smoothing(
+      const double smoothing_coefficient) = 0;
+
  protected:
   //! particleBase id
   Index id_{std::numeric_limits<Index>::max()};

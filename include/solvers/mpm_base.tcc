@@ -1185,7 +1185,7 @@ bool mpm::MPMBase<Tdim>::resume_remove_particles(const mpm::Index resume_step) {
       }
     }
   } else {
-    for (auto rstep : remove_steps_) {
+    for (auto rstep : continuous_remove_steps_) {
       // Check remove steps before resume step
       if (rstep.first <= resume_step) {
         status = this->apply_continuous_remove_step(rstep.first);

@@ -276,6 +276,11 @@ class Particle : public ParticleBase<Tdim> {
   //! Return neighbour ids
   std::vector<mpm::Index> neighbours() const override { return neighbours_; };
 
+  void map_effective_stress(const double smoothing_coefficient) override;
+
+  bool compute_effective_stress_smoothing(
+      const double smoothing_coefficient) override;
+
  private:
   //! Compute strain rate
   inline Eigen::Matrix<double, 6, 1> compute_strain_rate(
