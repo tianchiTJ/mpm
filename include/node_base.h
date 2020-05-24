@@ -112,6 +112,9 @@ class NodeBase {
   virtual void update_external_force(bool update, unsigned phase,
                                      const VectorDim& force) noexcept = 0;
 
+  virtual void update_strut_force(bool update, unsigned phase,
+                                  const VectorDim& force) noexcept = 0;
+
   //! Return external force
   //! \param[in] phase Index corresponding to the phase
   virtual VectorDim external_force(unsigned phase) const = 0;

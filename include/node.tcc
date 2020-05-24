@@ -34,6 +34,7 @@ void mpm::Node<Tdim, Tdof, Tnphases>::initialise() noexcept {
   status_ = false;
   material_ids_.clear();
   effective_pressure_ = 0.;
+  strut_force_.setZero();
 }
 
 //! Initialise shared pointer to nodal properties pool
@@ -117,6 +118,22 @@ void mpm::Node<Tdim, Tdof, Tnphases>::update_external_force(
   // Update/assign external force
   std::lock_guard<std::mutex> guard(node_mutex_);
   external_force_.col(phase) = external_force_.col(phase) * factor + force;
+}
+
+//! Update strut force
+template <unsigned Tdim, unsigned Tdof, unsigned Tnphases>
+void mpm::Node<Tdim, Tdof, Tnphases>::update_strut_force(
+    bool update, unsigned phase,
+    const Eigen::Matrix<double, Tdim, 1>& force) noexcept {
+  // Assert
+  assert(phase < Tnphases);
+
+  // Decide to update or assign
+  const double factor = (update == true) ? 1. : 0.;
+
+  // Update/assign external force
+  std::lock_guard<std::mutex> guard(node_mutex_);
+  strut_force_ = strut_force_ * factor + force;
 }
 
 //! Update internal force (body force / traction force)
@@ -220,10 +237,36 @@ bool mpm::Node<Tdim, Tdof, Tnphases>::compute_acceleration_velocity(
   bool status = false;
   const double tolerance = 1.0E-15;
   if (mass_(phase) > tolerance) {
+    // Total force
+    Eigen::Matrix<double, Tdim, 1> total_force =
+        (this->external_force_.col(phase) + this->internal_force_.col(phase));
+
+    // Check total force + strut force
+    for (unsigned i = 0; i < Tdim; ++i) {
+      if (fabs(strut_force_(i)) > std::numeric_limits<double>::epsilon()) {
+        if ((strut_force_(i) + total_force(i)) * total_force(i) < 0 &&
+            fabs(strut_force_(i) + total_force(i)) >
+                fabs(this->velocity_.col(phase)(i) / dt * this->mass_(phase)))
+          total_force(i) =
+              -this->velocity_.col(phase)(i) / dt * this->mass_(phase);
+        else
+          total_force(i) += strut_force_(i);
+      }
+    }
+    // std::cout << "nid=" << id_ << "\n"
+    //           << "strut_force_x="
+    //           << total_force(0) - (this->external_force_.col(phase)(0) +
+    //                                this->internal_force_.col(phase)(0))
+    //           << "\n";
+    // std::cout << "strut_force_y="
+    //           << total_force(1) - (this->external_force_.col(phase)(1) +
+    //                                this->internal_force_.col(phase)(1))
+    //           << "\n";
     // acceleration = (unbalaced force / mass)
-    this->acceleration_.col(phase) =
-        (this->external_force_.col(phase) + this->internal_force_.col(phase)) /
-        this->mass_(phase);
+    // this->acceleration_.col(phase) =
+    //     (this->external_force_.col(phase) + this->internal_force_.col(phase))
+    //     / this->mass_(phase);
+    this->acceleration_.col(phase) = total_force / this->mass_(phase);
 
     // Apply friction constraints
     this->apply_friction_constraints(dt);

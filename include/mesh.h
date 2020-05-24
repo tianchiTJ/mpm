@@ -465,6 +465,22 @@ class Mesh {
     ex_right_ = ex_right;
   };
 
+  //! Create strut
+  void create_strut(unsigned id, Eigen::Matrix<double, 1, 2>& points,
+                    Eigen::Matrix<double, 1, 7>& properties, bool moment) {
+    strut_points_.insert(
+        std::pair<mpm::Index, Eigen::Matrix<double, 1, 2>>(id, points));
+    strut_properties_.insert(
+        std::pair<mpm::Index, Eigen::Matrix<double, 1, 7>>(id, properties));
+    strut_moment_ = moment;
+  }
+
+  //! Apply strut step
+  bool apply_strut_step(const unsigned strut_id);
+
+  //! Compute strut normal vector
+  Eigen::Matrix<double, Tdim, 1> compute_strut_normal(const unsigned pid);
+
  private:
   // Read particles from file
   //! \param[in] pset_id Set ID of the particles
@@ -542,6 +558,12 @@ class Mesh {
   //! Remove boundary
   double ex_left_{0};
   double ex_right_{0};
+  //! Strut points
+  tsl::robin_map<unsigned, Eigen::Matrix<double, 1, 2>> strut_points_;
+  //! Strut properties
+  tsl::robin_map<unsigned, Eigen::Matrix<double, 1, 7>> strut_properties_;
+  // Strut moment option
+  bool strut_moment_{false};
 
   //! Remove
 };  // Mesh class

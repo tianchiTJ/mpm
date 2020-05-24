@@ -84,8 +84,25 @@ class MPMBase : public MPM {
   //! \retval remove_status Return the successful remove of particle sets
   bool resume_remove_particles(const mpm::Index rstep);
 
+  bool resume_change_material_particles(const mpm::Index resume_step);
+
   //! Initialise remove steps
   bool initialise_remove_steps(const Json& remove_steps);
+
+  //! Initialise change material steps
+  bool initialise_change_material_steps(const Json& change_material_steps);
+
+  //! Appl change material step
+  bool appl_change_material_step(const mpm::Index cmstep);
+
+  //! Initialise struts
+  bool initialise_struts(const Json& struts);
+
+  //! Apply strut step
+  bool apply_strut_step(const mpm::Index sstep);
+
+  //! Apply change material step
+  bool apply_change_material_step(const mpm::Index cmstep);
 
 #ifdef USE_VTK
   //! Write VTK files
@@ -216,7 +233,7 @@ class MPMBase : public MPM {
   double damping_factor_{0.};
   //! Locate particles
   bool locate_particles_{true};
-  //! Container of remove steps(remove step, number of particle sets)
+  //! Container of remove steps(remove step, particle sets)
   tsl::robin_map<mpm::Index, std::vector<unsigned>> remove_steps_;
   //! Container of continuous remove steps(remove step, excavation depth)
   tsl::robin_map<mpm::Index, double> continuous_remove_steps_;
@@ -228,6 +245,15 @@ class MPMBase : public MPM {
   bool remove_continuously_{false};
   //! Remove step
   bool remove_step_{false};
+  //! Strut step
+  bool strut_step_{false};
+  //! Container of strut steps(strut step, strut ids)
+  tsl::robin_map<mpm::Index, std::vector<unsigned>> strut_steps_;
+  //! Change material step
+  bool change_material_step_{false};
+  //! Container of change material steps(step,  particle sets)
+  tsl::robin_map<mpm::Index, std::vector<std::pair<unsigned, unsigned>>>
+      change_material_steps_;
 
 #ifdef USE_GRAPH_PARTITIONING
   // graph pass the address of the container of cell

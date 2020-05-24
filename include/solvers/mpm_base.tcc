@@ -88,7 +88,32 @@ mpm::MPMBase<Tdim>::MPMBase(const std::shared_ptr<IO>& io) : mpm::MPM(io) {
         this->initialise_remove_steps(remove_steps);
       }
     } catch (std::exception& exception) {
-      console_->warn("{} #{}: No remove steps are defined", __FILE__, __LINE__,
+      console_->warn("{} #{}: No remove step is defined", __FILE__, __LINE__,
+                     exception.what());
+    }
+
+    // Change material
+    try {
+      // Get change material steps properties
+      auto change_material_steps = io_->json_object("change_material_steps");
+      if (!change_material_steps.empty()) {
+        this->change_material_step_ = true;
+        this->initialise_change_material_steps(change_material_steps);
+      }
+    } catch (std::exception& exception) {
+      console_->warn("{} #{}: No remove step is defined", __FILE__, __LINE__,
+                     exception.what());
+    }
+    // Struts
+    try {
+      // Get strut steps properties
+      auto strut_steps = io_->json_object("strut_steps");
+      if (!strut_steps.empty()) {
+        this->strut_step_ = true;
+        this->initialise_struts(strut_steps);
+      }
+    } catch (std::exception& exception) {
+      console_->warn("{} #{}: No strut step is defined", __FILE__, __LINE__,
                      exception.what());
     }
 
@@ -410,6 +435,9 @@ bool mpm::MPMBase<Tdim>::checkpoint_resume() {
     // Get step
     this->step_ = analysis_["resume"]["step"].template get<mpm::Index>();
 
+    // Initialise change material
+    this->resume_change_material_particles(step_);
+
     // Initialise remove particles
     this->resume_remove_particles(step_);
 
@@ -496,7 +524,8 @@ void mpm::MPMBase<Tdim>::write_vtk(mpm::Index step, mpm::Index max_steps) {
 #endif
 
   //! VTK vector variables
-  std::vector<std::string> vtk_vector_data = {"displacements", "velocities"};
+  std::vector<std::string> vtk_vector_data = {"displacements", "velocities",
+                                              "material"};
 
   // Write VTK attributes
   for (const auto& attribute : vtk_vector_data) {
@@ -520,7 +549,8 @@ void mpm::MPMBase<Tdim>::write_vtk(mpm::Index step, mpm::Index max_steps) {
   }
 
   //! VTK tensor variables
-  std::vector<std::string> vtk_tensor_data = {"stresses", "strains"};
+  std::vector<std::string> vtk_tensor_data = {"stresses", "strains",
+                                              "strut_forces"};
 
   // Write VTK attributes
   for (const auto& attribute : vtk_tensor_data) {
@@ -1257,9 +1287,170 @@ bool mpm::MPMBase<Tdim>::initialise_remove_steps(const Json& remove_steps) {
     }
 
   } catch (std::exception& exception) {
-    console_->error("#{}: Reading math functions: {}", __LINE__,
+    console_->error("#{}: Reading excavation steps: {}", __LINE__,
                     exception.what());
     status = false;
+  }
+  return status;
+}
+
+//! Initialise struts
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::initialise_struts(const Json& struts) {
+  bool status = true;
+  try {
+    // Get struts properties
+    for (const auto& strut : struts) {
+      // Strut id
+      auto id = strut["id"].template get<unsigned>();
+      // Strut points
+      Eigen::Matrix<double, 1, 2> strut_points;
+      strut_points.setZero();
+      // Get strut points
+      strut_points(0) = strut["left"].template get<mpm::Index>();
+      strut_points(1) = strut["right"].template get<mpm::Index>();
+      // Get installment step
+      auto sstep = strut["sstep"].template get<mpm::Index>();
+      // Strut properties
+      Eigen::Matrix<double, 1, 7> strut_properties;
+      strut_properties.setZero();
+      // Get initial length
+      strut_properties(0) = strut["l0"].template get<double>();
+      // Get EI
+      strut_properties(1) = strut["EI"].template get<double>();
+      // Get EA
+      strut_properties(2) = strut["EA"].template get<double>();
+      // Peak astrain
+      strut_properties(3) = strut["peak_astrain"].template get<double>();
+      // Residual astrain
+      strut_properties(4) = strut["residual_astrain"].template get<double>();
+      // Residual axial force
+      strut_properties(5) = strut["residual_aforce"].template get<double>();
+      // Peak astrain
+      strut_properties(6) = strut["peak_theta"].template get<double>();
+      // Moment option
+      bool moment = strut["moment"].template get<bool>();
+      // Create strut
+      mesh_->create_strut(id, strut_points, strut_properties, moment);
+      // Initialise sids
+      std::vector<unsigned> sids;
+      // Get the current strut step existing at "sstep"
+      if (strut_steps_.find(sstep) != strut_steps_.end()) {
+        // Get the set of strut ids
+        sids = strut_steps_.at(sstep);
+        // Delete the strut step existing at "sstep"
+        strut_steps_.erase(sstep);
+      }
+      // Add strut into the vector
+      sids.insert(sids.end(), id);
+      // Update the current remove step existing at "rstep"
+      strut_steps_.insert(
+          std::pair<mpm::Index, std::vector<unsigned>>(sstep, sids));
+    }
+  } catch (std::exception& exception) {
+    console_->error("#{}: Reading strut steps: {}", __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Apply strut step
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::apply_strut_step(const mpm::Index sstep) {
+  bool status = false;
+  try {
+    for (auto strut_step : strut_steps_) {
+      if (strut_step.first <= sstep) {
+        // Iterate over each strut in the current step
+        for (auto sid : strut_step.second) mesh_->apply_strut_step(sid);
+      }
+    }
+
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Particle change material step
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::initialise_change_material_steps(
+    const Json& change_material_steps) {
+  bool status = true;
+  try {
+    // Get change material steps properties
+    for (const auto& change_props : change_material_steps) {
+      // Get change material step
+      auto cmstep = change_props["cmstep"].template get<mpm::Index>();
+      // Get function type
+      auto pset_id = change_props["pset_id"].template get<unsigned>();
+      // New material id
+      auto material_id = change_props["material_id"].template get<unsigned>();
+      //! Initialse the set of particle sets ids
+      std::vector<std::pair<unsigned, unsigned>> sids;
+      // Get the current change material step existing at "cmstep"
+      if (change_material_steps_.find(cmstep) != change_material_steps_.end()) {
+        // Get the set of particle sets ids
+        sids = change_material_steps_.at(cmstep);
+        // Delete the change material step existing at "cmstep"
+        change_material_steps_.erase(cmstep);
+      }
+
+      // New set id and material id
+      auto sid_mid = std::make_pair<unsigned, unsigned>(
+          static_cast<unsigned>(pset_id), static_cast<unsigned>(material_id));
+
+      // Add set id of particle set into the vector
+      sids.insert(sids.end(), sid_mid);
+
+      // Update the current change material step existing at "cmstep"
+      change_material_steps_.insert(
+          std::pair<mpm::Index, std::vector<std::pair<unsigned, unsigned>>>(
+              cmstep, sids));
+    }
+  } catch (std::exception& exception) {
+    console_->error("#{}: Reading excavation steps: {}", __LINE__,
+                    exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Apply change material step
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::apply_change_material_step(const mpm::Index cmstep) {
+  bool status = true;
+  try {
+    if (change_material_steps_.find(cmstep) != change_material_steps_.end()) {
+      // Sid and mid
+      auto sid_mid = change_material_steps_.at(cmstep);
+      for (auto s_m : sid_mid) {
+        // Iterate over each particle sets in the change material step
+        mesh_->iterate_over_particle_set(
+            s_m.first,
+            std::bind(&mpm::ParticleBase<Tdim>::assign_material,
+                      std::placeholders::_1, materials_.at(s_m.second)));
+      }
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+    status = false;
+  }
+  return status;
+}
+
+//! Resume change material particles
+template <unsigned Tdim>
+bool mpm::MPMBase<Tdim>::resume_change_material_particles(
+    const mpm::Index resume_step) {
+  bool status = false;
+  // Iterate over each change material steps
+  for (auto cmstep : change_material_steps_) {
+    // Check remove steps before resume step
+    if (cmstep.first <= resume_step) {
+      status = this->apply_change_material_step(cmstep.first);
+    }
   }
   return status;
 }

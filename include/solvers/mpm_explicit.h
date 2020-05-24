@@ -79,6 +79,10 @@ class MPMExplicit : public MPMBase<Tdim> {
   using mpm::MPMBase<Tdim>::remove_step_;
   //! Current continuous remove step
   using mpm::MPMBase<Tdim>::current_remove_steps_;
+  //! Strut step
+  using mpm::MPMBase<Tdim>::strut_step_;
+  //! Change material
+  using mpm::MPMBase<Tdim>::change_material_step_;
 
  private:
   //! Pressure smoothing

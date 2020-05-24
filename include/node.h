@@ -108,6 +108,9 @@ class Node : public NodeBase<Tdim> {
   void update_external_force(bool update, unsigned phase,
                              const VectorDim& force) noexcept override;
 
+  void update_strut_force(bool update, unsigned phase,
+                          const VectorDim& force) noexcept override;
+
   //! Return external force at a given node for a given phase
   //! \param[in] phase Index corresponding to the phase
   VectorDim external_force(unsigned phase) const override {
@@ -314,6 +317,8 @@ class Node : public NodeBase<Tdim> {
   std::set<unsigned> mpi_ranks_;
   //! Effective pressure
   double effective_pressure_;
+  //! Strut force
+  Eigen::Matrix<double, Tdim, 1> strut_force_;
 };  // Node class
 }  // namespace mpm
 

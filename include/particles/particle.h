@@ -5,6 +5,7 @@
 #include <tbb/parallel_for.h>
 
 #include <array>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <string>
@@ -209,6 +210,11 @@ class Particle : public ParticleBase<Tdim> {
   //! Return displacement of the particle
   VectorDim displacement() const override { return displacement_; }
 
+  //! Strut force
+  Eigen::Matrix<double, 6, 1> strut_force() const override {
+    return strut_force_;
+  }
+
   //! Assign traction to the particle
   //! \param[in] direction Index corresponding to the direction of traction
   //! \param[in] traction Particle traction in specified direction
@@ -281,6 +287,17 @@ class Particle : public ParticleBase<Tdim> {
   bool compute_effective_stress_smoothing(
       const double smoothing_coefficient) override;
 
+  void map_strut_force(
+      Eigen::Matrix<double, Tdim, 1> strut_force) noexcept override;
+
+  void map_strut_moment(double moment) noexcept override;
+
+  //! Return the approximate particle diameter
+  double diameter() const override {
+    if (Tdim == 2) return 2.0 * std::sqrt(volume_ / M_PI);
+    if (Tdim == 3) return 2.0 * std::pow(volume_ * 0.75 / M_PI, (1 / 3));
+  }
+
  private:
   //! Compute strain rate
   inline Eigen::Matrix<double, 6, 1> compute_strain_rate(
@@ -351,6 +368,8 @@ class Particle : public ParticleBase<Tdim> {
   std::unique_ptr<spdlog::logger> console_;
   //! Map of vector properties
   std::map<std::string, std::function<Eigen::VectorXd()>> properties_;
+  //! Strut force
+  Eigen::Matrix<double, 6, 1> strut_force_;
 
 };  // Particle class
 }  // namespace mpm

@@ -234,6 +234,7 @@ void mpm::Particle<Tdim>::initialise() {
   stress_.setZero();
   traction_.setZero();
   velocity_.setZero();
+  strut_force_.setZero();
   volume_ = std::numeric_limits<double>::max();
   volumetric_strain_centroid_ = 0.;
 
@@ -242,6 +243,13 @@ void mpm::Particle<Tdim>::initialise() {
   this->properties_["strains"] = [&]() { return strain(); };
   this->properties_["velocities"] = [&]() { return velocity(); };
   this->properties_["displacements"] = [&]() { return displacement(); };
+  this->properties_["strut_forces"] = [&]() { return strut_force(); };
+  this->properties_["material"] = [&]() {
+    Eigen::Matrix<double, Tdim, 1> material_id;
+    material_id.setZero();
+    material_id(0) = this->material_id();
+    return material_id;
+  };
 }
 
 //! Assign material state variables from neighbour particle
@@ -706,6 +714,48 @@ void mpm::Particle<Tdim>::map_traction_force() noexcept {
     for (unsigned i = 0; i < nodes_.size(); ++i)
       nodes_[i]->update_external_force(true, mpm::ParticlePhase::Solid,
                                        (shapefn_[i] * traction_));
+  }
+}
+
+//! Map strut force
+template <unsigned Tdim>
+void mpm::Particle<Tdim>::map_strut_force(
+    Eigen::Matrix<double, Tdim, 1> strut_force) noexcept {
+  // Strut force
+  for (unsigned i = 0; i < Tdim; ++i) strut_force_(i) = strut_force(i);
+  // Map particle traction forces to nodes
+  for (unsigned i = 0; i < nodes_.size(); ++i)
+    nodes_[i]->update_strut_force(true, mpm::ParticlePhase::Solid,
+                                  (shapefn_[i] * strut_force));
+}
+
+//! Map strut moment
+template <unsigned Tdim>
+void mpm::Particle<Tdim>::map_strut_moment(double moment) noexcept {
+  // Strut force
+  strut_force_(3) = moment;
+  // Clockwise moment is positive
+  for (unsigned i = 0; i < nodes_.size(); ++i) {
+    // Nodal coordinates
+    auto n_coord = nodes_[i]->coordinates();
+    // Initialise strut force
+    VectorDim strut_force;
+    strut_force.setZero();
+    if (Tdim == 2) {
+      // Force_x
+      strut_force(0) = moment / (Tdim * nodes_.size()) /
+                       (n_coord(1) - this->coordinates_(1));
+      // Force_y
+      strut_force(1) = moment / (Tdim * nodes_.size()) /
+                       (this->coordinates_(0) - n_coord(0));
+    }
+    // Map particle traction forces to nodes
+    nodes_[i]->update_strut_force(true, mpm::ParticlePhase::Solid,
+                                  (shapefn_[i] * strut_force));
+    // std::cout << "nid=" << nodes_[i]->id() << "\n"
+    //           << "strut_force =[" << strut_force(0) << "," << strut_force(1)
+    //           << "]"
+    //           << "\n";
   }
 }
 

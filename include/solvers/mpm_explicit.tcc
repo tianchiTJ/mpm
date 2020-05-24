@@ -146,6 +146,10 @@ bool mpm::MPMExplicit<Tdim>::solve() {
     // Inject particles
     mesh_->inject_particles(this->step_ * this->dt_);
 
+    if (change_material_step_) {
+      this->apply_change_material_step(step_);
+    }
+
     // Apply remove step
     if (remove_step_) {
       if (!remove_continuously_)
@@ -230,6 +234,9 @@ bool mpm::MPMExplicit<Tdim>::solve() {
         mesh_->iterate_over_nodes(
             std::bind(&mpm::NodeBase<Tdim>::apply_concentrated_force,
                       std::placeholders::_1, phase, (this->step_ * this->dt_)));
+
+      // Apply struts
+      if (strut_step_) this->apply_strut_step(step_);
     });
 
     // Spawn a task for internal force

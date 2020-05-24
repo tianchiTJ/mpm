@@ -212,6 +212,9 @@ class ParticleBase {
   //! Return displacement of the particle
   virtual VectorDim displacement() const = 0;
 
+  //! Strut force
+  virtual Eigen::Matrix<double, 6, 1> strut_force() const = 0;
+
   //! Assign traction
   virtual bool assign_traction(unsigned direction, double traction) = 0;
 
@@ -257,6 +260,13 @@ class ParticleBase {
 
   virtual bool compute_effective_stress_smoothing(
       const double smoothing_coefficient) = 0;
+
+  virtual void map_strut_force(Eigen::Matrix<double, Tdim, 1> strut_force) = 0;
+
+  virtual void map_strut_moment(double moment) = 0;
+
+  //! Return the approximate particle diameter
+  virtual double diameter() const = 0;
 
  protected:
   //! particleBase id

@@ -1927,3 +1927,195 @@ bool mpm::Mesh<Tdim>::apply_continuous_remove_step(const double ex_depth) {
   }
   return status;
 }
+
+//! Apply strut step
+template <unsigned Tdim>
+bool mpm::Mesh<Tdim>::apply_strut_step(const unsigned strut_id) {
+  bool status = false;
+  try {
+    status = true;
+    // Get strut points
+    auto strut_points = strut_points_.at(strut_id);
+    // Get strut properties
+    auto strut_properties = strut_properties_.at(strut_id);
+    // Left coordinates
+    auto left = map_particles_[strut_points(0)]->coordinates();
+    // Right coordinates
+    auto right = map_particles_[strut_points(1)]->coordinates();
+    // Compute length
+    double length = 0;
+    for (unsigned i = 0; i < Tdim; ++i)
+      length += std::pow(left(i) - right(i), 2);
+    length = std::sqrt(length);
+    // Compute direction
+    auto dir = right - left;
+    // Axial strain
+    double astrain = (length - strut_properties(0)) / strut_properties(0);
+    // Compute axial force
+    double axial_force = 0;
+    if (astrain < 0) {
+      astrain *= -1;
+      if (astrain < strut_properties(3))
+        axial_force = astrain * strut_properties(2);
+      else if (astrain < strut_properties(4))
+        axial_force =
+            strut_properties(3) * strut_properties(2) -
+            (strut_properties(3) * strut_properties(2) - strut_properties(5)) /
+                (strut_properties(4) - strut_properties(3)) *
+                (astrain - strut_properties(3));
+      else
+        axial_force = strut_properties(5);
+    }
+
+    // Strut force
+    Eigen::Matrix<double, Tdim, 1> strut_force;
+    strut_force.setZero();
+    // Force_x
+    strut_force(0) = axial_force * dir(0) /
+                     std::sqrt(std::pow(dir(0), 2) + std::pow(dir(1), 2));
+    // Force_y
+    strut_force(1) = axial_force * dir(1) /
+                     std::sqrt(std::pow(dir(0), 2) + std::pow(dir(1), 2));
+    // Map strut force of left point
+    map_particles_[strut_points(0)]->map_strut_force(-strut_force);
+    // Map strut force of right point
+    map_particles_[strut_points(1)]->map_strut_force(strut_force);
+    // std::cout << "astrain =" << astrain << "\n";
+    // std::cout << "strut_force_a =" << strut_force << "\n";
+    // Moment option
+    if (strut_moment_) {
+      // Left strut point normal vector
+      Eigen::Matrix<double, Tdim, 1> normal_left =
+          this->compute_strut_normal(strut_points(0));
+      // Right strut point normal vector
+      Eigen::Matrix<double, Tdim, 1> normal_right =
+          this->compute_strut_normal(strut_points(1));
+
+      // Left point rotation angle
+      double theta_left =
+          acos(dir.dot(normal_left) / (dir.norm() * normal_left.norm()));
+      if (theta_left > strut_properties(6)) theta_left = strut_properties(6);
+      if (theta_left < -strut_properties(6)) theta_left = -strut_properties(6);
+      if (dir(0) * normal_left(1) - dir(1) * normal_left(0) < 0)
+        theta_left *= -1.0;
+
+      // Right point rotation angle
+      double theta_right =
+          acos(-dir.dot(normal_right) / (dir.norm() * normal_right.norm()));
+      if (theta_right > strut_properties(6)) theta_right = strut_properties(6);
+      if (theta_right < -strut_properties(6))
+        theta_right = -strut_properties(6);
+      if (dir(1) * normal_right(0) - dir(0) * normal_right(1) < 0)
+        theta_right *= -1.0;
+
+      // Left moment
+      const double moment_left = (4 * theta_left + 2 * theta_right) *
+                                 strut_properties(1) / strut_properties(0);
+
+      // Right moment
+      const double moment_right = (2 * theta_left + 4 * theta_right) *
+                                  strut_properties(1) / strut_properties(0);
+
+      // Map strut moment of left point
+      map_particles_[strut_points(0)]->map_strut_moment(moment_left);
+      // Map strut moment of right point
+      map_particles_[strut_points(1)]->map_strut_moment(moment_right);
+      // std::cout << "normal vector left =[" << normal_left(0) << ","
+      //           << normal_left(1) << "]"
+      //           << "\n";
+      // std::cout << "normal vector right =[" << normal_right(0) << ","
+      //           << normal_right(1) << "]"
+      //           << "\n";
+      // std::cout << "theta_left=" << theta_left << "\n";
+      // std::cout << "theta_right=" << theta_right << "\n";
+      // std::cout << "left to right =[" << dir(0) << "," << dir(1) << "]"
+      //           << "\n";
+    }
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+  }
+  return status;
+}
+
+//! Compute normal direction of strut points
+template <unsigned Tdim>
+Eigen::Matrix<double, Tdim, 1> mpm::Mesh<Tdim>::compute_strut_normal(
+    const unsigned pid) {
+  // Initialise normal vector
+  VectorDim normal;
+  normal.setZero();
+  try {
+    // Cell id of the strut particle
+    const auto cid = map_particles_[pid]->cell_id();
+    // Find neighbour particles in the same cell
+    this->find_particle_neighbours(map_cells_[cid]);
+    // Neighbour particles
+    const auto& neighbour_particles = map_particles_[pid]->neighbours();
+    // Coordinates of the particle
+    const auto& p_coord = map_particles_[pid]->coordinates();
+    // Particle diameter
+    const double smoothing_length = 1.33 * map_particles_[pid]->diameter();
+    // Initialise kernal gradient of neighbour particles
+    std::map<mpm::Index, VectorDim> kernel_gradients;
+    // kernal gradient of neighbour particles
+    for (const auto n_p : neighbour_particles) {
+      // Neighbour particle's coordinates
+      const auto& n_coord = map_particles_[n_p]->coordinates();
+      // Relative coordinates
+      const VectorDim rel_coord = n_coord - p_coord;
+      // Normal distance
+      const double norm_distance = rel_coord.norm();
+      // Assign multiplier depends on dimension
+      double dw_dr = 0;
+      if (Tdim == 2)
+        dw_dr = 1.0 / (M_PI * std::pow(smoothing_length, 2));
+      else
+        dw_dr = 1.0 / std::pow((std::sqrt(M_PI) * smoothing_length), 3);
+      // Compute basis function
+      const double radius = norm_distance / smoothing_length;
+      if (radius >= 0.0 && radius < 3.0)
+        dw_dr *= -2.0 * radius * std::exp(-std::pow(radius, 2));
+      else
+        dw_dr = 0.0;
+      // Compute kernel gradient
+      // Gradient = dw_dr * r / ||r|| / h
+      VectorDim kernel_gradient = -rel_coord;
+      if (norm_distance > 1.e-12)
+        kernel_gradient *= dw_dr / (norm_distance * smoothing_length);
+      else
+        kernel_gradient *= 0.0;
+      // Insert into the map
+      kernel_gradients.insert(
+          std::pair<mpm::Index, VectorDim>(n_p, kernel_gradient));
+    }
+
+    // Initialize renormalization matrix
+    Eigen::Matrix<double, Tdim, Tdim> renormalization_matrix_inv;
+    renormalization_matrix_inv.setZero();
+    // Sum of kernal by volume
+    VectorDim kernal_sum;
+    kernal_sum.setZero();
+    // Iterate over neighbour particles
+    for (const auto n_p : neighbour_particles) {
+      // Neighbour particle's coordinates
+      const auto& n_coord = map_particles_[n_p]->coordinates();
+      // Relative coordinates
+      const VectorDim rel_coord = n_coord - p_coord;
+      // Compute density gradient
+      VectorDim density_gradient =
+          (map_particles_[n_p]->mass() / map_particles_[n_p]->mass_density()) *
+          kernel_gradients.at(n_p);
+      // Add kernal sum
+      kernal_sum += density_gradient;
+      // Inverse of renormalization matrix B
+      renormalization_matrix_inv += density_gradient * rel_coord.transpose();
+    }
+    // Compute normal vector
+    normal = -renormalization_matrix_inv.inverse() * kernal_sum;
+    normal.normalize();
+
+  } catch (std::exception& exception) {
+    console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
+  }
+  return normal;
+}
