@@ -261,12 +261,16 @@ class ParticleBase {
   virtual bool compute_effective_stress_smoothing(
       const double smoothing_coefficient) = 0;
 
-  virtual void map_strut_force(Eigen::Matrix<double, Tdim, 1> strut_force) = 0;
+  virtual void map_strut_force(Eigen::Matrix<double, Tdim, 1> strut_force,
+                               const double pastrain) = 0;
 
   virtual void map_strut_moment(double moment) = 0;
 
   //! Return the approximate particle diameter
   virtual double diameter() const = 0;
+
+  virtual void add_state_variable(const std::string& var,
+                                  const double value) = 0;
 
  protected:
   //! particleBase id

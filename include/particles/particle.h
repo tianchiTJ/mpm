@@ -287,8 +287,8 @@ class Particle : public ParticleBase<Tdim> {
   bool compute_effective_stress_smoothing(
       const double smoothing_coefficient) override;
 
-  void map_strut_force(
-      Eigen::Matrix<double, Tdim, 1> strut_force) noexcept override;
+  void map_strut_force(Eigen::Matrix<double, Tdim, 1> strut_force,
+                       const double pastrain) noexcept override;
 
   void map_strut_moment(double moment) noexcept override;
 
@@ -296,6 +296,13 @@ class Particle : public ParticleBase<Tdim> {
   double diameter() const override {
     if (Tdim == 2) return 2.0 * std::sqrt(volume_ / M_PI);
     if (Tdim == 3) return 2.0 * std::pow(volume_ * 0.75 / M_PI, (1 / 3));
+  }
+
+  void add_state_variable(const std::string& var, const double value) override {
+    if (state_variables_.find(var) != state_variables_.end())
+      state_variables_.at(var) = value;
+    else
+      state_variables_.insert(std::make_pair(var, value));
   }
 
  private:

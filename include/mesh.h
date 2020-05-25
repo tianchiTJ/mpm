@@ -466,10 +466,10 @@ class Mesh {
   };
 
   //! Create strut
-  void create_strut(unsigned id, Eigen::Matrix<double, 1, 2>& points,
+  void create_strut(unsigned id, Eigen::Matrix<mpm::Index, 1, 2>& points,
                     Eigen::Matrix<double, 1, 7>& properties, bool moment) {
     strut_points_.insert(
-        std::pair<mpm::Index, Eigen::Matrix<double, 1, 2>>(id, points));
+        std::pair<mpm::Index, Eigen::Matrix<mpm::Index, 1, 2>>(id, points));
     strut_properties_.insert(
         std::pair<mpm::Index, Eigen::Matrix<double, 1, 7>>(id, properties));
     strut_moment_ = moment;
@@ -559,7 +559,7 @@ class Mesh {
   double ex_left_{0};
   double ex_right_{0};
   //! Strut points
-  tsl::robin_map<unsigned, Eigen::Matrix<double, 1, 2>> strut_points_;
+  tsl::robin_map<unsigned, Eigen::Matrix<mpm::Index, 1, 2>> strut_points_;
   //! Strut properties
   tsl::robin_map<unsigned, Eigen::Matrix<double, 1, 7>> strut_properties_;
   // Strut moment option

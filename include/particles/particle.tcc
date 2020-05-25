@@ -614,6 +614,11 @@ void mpm::Particle<Tdim>::compute_stress() noexcept {
   // Calculate stress
   this->stress_ =
       material_->compute_stress(stress_, dstrain_, this, &state_variables_);
+  // Check broken
+  if (state_variables_.find("broken") != state_variables_.end()) {
+    if (state_variables_.at("broken") == std::numeric_limits<double>::max())
+      this->mass_ = 0.;
+  }
 }
 
 //! Map body force
@@ -720,9 +725,12 @@ void mpm::Particle<Tdim>::map_traction_force() noexcept {
 //! Map strut force
 template <unsigned Tdim>
 void mpm::Particle<Tdim>::map_strut_force(
-    Eigen::Matrix<double, Tdim, 1> strut_force) noexcept {
+    Eigen::Matrix<double, Tdim, 1> strut_force,
+    const double pastrain) noexcept {
   // Strut force
   for (unsigned i = 0; i < Tdim; ++i) strut_force_(i) = strut_force(i);
+  // Plastic axial sstrain
+  this->state_variables_["strut_pastrain"] = pastrain;
   // Map particle traction forces to nodes
   for (unsigned i = 0; i < nodes_.size(); ++i)
     nodes_[i]->update_strut_force(true, mpm::ParticlePhase::Solid,

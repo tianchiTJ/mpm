@@ -1951,20 +1951,64 @@ bool mpm::Mesh<Tdim>::apply_strut_step(const unsigned strut_id) {
     auto dir = right - left;
     // Axial strain
     double astrain = (length - strut_properties(0)) / strut_properties(0);
-    // Compute axial force
+    // Axial force
     double axial_force = 0;
+    // Axial plastic strain
+    double pastrain =
+        map_particles_[strut_points(0)]->state_variable("strut_pastrain");
+    // Compute axial force left
     if (astrain < 0) {
+      // Compression positive
       astrain *= -1;
-      if (astrain < strut_properties(3))
-        axial_force = astrain * strut_properties(2);
-      else if (astrain < strut_properties(4))
-        axial_force =
-            strut_properties(3) * strut_properties(2) -
-            (strut_properties(3) * strut_properties(2) - strut_properties(5)) /
-                (strut_properties(4) - strut_properties(3)) *
-                (astrain - strut_properties(3));
-      else
-        axial_force = strut_properties(5);
+      // Current in plastic process
+      if (pastrain > std::numeric_limits<double>::epsilon()) {
+        // Loading process
+        if (astrain > (strut_properties(3) + pastrain)) {
+          if (astrain < strut_properties(4)) {
+            axial_force = strut_properties(3) * strut_properties(2) -
+                          (strut_properties(3) * strut_properties(2) -
+                           strut_properties(5)) /
+                              (strut_properties(4) - strut_properties(3)) *
+                              (astrain - strut_properties(3));
+
+          } else {
+            axial_force = strut_properties(5);
+          }
+          // Update axial plastic strain
+          pastrain = astrain - strut_properties(3);
+        }
+        // Unloading process
+        else {
+          if ((strut_properties(3) + pastrain) < strut_properties(4))
+            axial_force =
+                (strut_properties(3) * strut_properties(2) -
+                 (strut_properties(3) * strut_properties(2) -
+                  strut_properties(5)) /
+                     (strut_properties(4) - strut_properties(3)) * pastrain) -
+                strut_properties(2) *
+                    (strut_properties(3) + pastrain - astrain);
+          else
+            axial_force = strut_properties(5);
+        }
+      }
+      // Current in elastic process
+      else {
+        if (astrain < strut_properties(3))
+          axial_force = astrain * strut_properties(2);
+        else if (astrain < strut_properties(4)) {
+          axial_force = strut_properties(3) * strut_properties(2) -
+                        (strut_properties(3) * strut_properties(2) -
+                         strut_properties(5)) /
+                            (strut_properties(4) - strut_properties(3)) *
+                            (astrain - strut_properties(3));
+          // Update axial plastic strain
+          pastrain = astrain - strut_properties(3);
+        } else {
+          axial_force = strut_properties(5);
+          // Update axial plastic strain
+          pastrain = astrain - strut_properties(3);
+        }
+      }
     }
 
     // Strut force
@@ -1977,9 +2021,9 @@ bool mpm::Mesh<Tdim>::apply_strut_step(const unsigned strut_id) {
     strut_force(1) = axial_force * dir(1) /
                      std::sqrt(std::pow(dir(0), 2) + std::pow(dir(1), 2));
     // Map strut force of left point
-    map_particles_[strut_points(0)]->map_strut_force(-strut_force);
+    map_particles_[strut_points(0)]->map_strut_force(-strut_force, pastrain);
     // Map strut force of right point
-    map_particles_[strut_points(1)]->map_strut_force(strut_force);
+    map_particles_[strut_points(1)]->map_strut_force(strut_force, pastrain);
     // std::cout << "astrain =" << astrain << "\n";
     // std::cout << "strut_force_a =" << strut_force << "\n";
     // Moment option

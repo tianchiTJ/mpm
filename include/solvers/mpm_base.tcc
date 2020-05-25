@@ -1304,7 +1304,7 @@ bool mpm::MPMBase<Tdim>::initialise_struts(const Json& struts) {
       // Strut id
       auto id = strut["id"].template get<unsigned>();
       // Strut points
-      Eigen::Matrix<double, 1, 2> strut_points;
+      Eigen::Matrix<mpm::Index, 1, 2> strut_points;
       strut_points.setZero();
       // Get strut points
       strut_points(0) = strut["left"].template get<mpm::Index>();
@@ -1347,6 +1347,10 @@ bool mpm::MPMBase<Tdim>::initialise_struts(const Json& struts) {
       strut_steps_.insert(
           std::pair<mpm::Index, std::vector<unsigned>>(sstep, sids));
     }
+    // Initialise strut results in state variable
+    mesh_->iterate_over_particles(
+        std::bind(&mpm::ParticleBase<Tdim>::add_state_variable,
+                  std::placeholders::_1, "strut_pastrain", 0.));
   } catch (std::exception& exception) {
     console_->error("#{}: Reading strut steps: {}", __LINE__, exception.what());
     status = false;

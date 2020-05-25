@@ -1,5 +1,6 @@
 #include "material.h"
 #include "bingham.h"
+#include "concrete.h"
 #include "linear_elastic.h"
 #include "modified_cam_clay.h"
 #include "mohr_coulomb.h"
@@ -55,3 +56,11 @@ static Register<mpm::Material<2>, mpm::NorSand<2>, unsigned, const Json&>
 // Norsand 3D
 static Register<mpm::Material<3>, mpm::NorSand<3>, unsigned, const Json&>
     nor_sand_3d("NorSand3D");
+
+// Concrete 2D
+static Register<mpm::Material<2>, mpm::Concrete<2>, unsigned, const Json&>
+    concrete_2d("Concrete2D");
+
+// Concrete 3D
+static Register<mpm::Material<3>, mpm::Concrete<3>, unsigned, const Json&>
+    concrete_3d("Concrete3D");
