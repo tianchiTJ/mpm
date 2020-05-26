@@ -235,6 +235,7 @@ void mpm::Particle<Tdim>::initialise() {
   traction_.setZero();
   velocity_.setZero();
   strut_force_.setZero();
+  strut_pstrain_.setZero();
   volume_ = std::numeric_limits<double>::max();
   volumetric_strain_centroid_ = 0.;
 
@@ -614,11 +615,6 @@ void mpm::Particle<Tdim>::compute_stress() noexcept {
   // Calculate stress
   this->stress_ =
       material_->compute_stress(stress_, dstrain_, this, &state_variables_);
-  // Check broken
-  if (state_variables_.find("broken") != state_variables_.end()) {
-    if (state_variables_.at("broken") == std::numeric_limits<double>::max())
-      this->mass_ = 0.;
-  }
 }
 
 //! Map body force
@@ -730,7 +726,7 @@ void mpm::Particle<Tdim>::map_strut_force(
   // Strut force
   for (unsigned i = 0; i < Tdim; ++i) strut_force_(i) = strut_force(i);
   // Plastic axial sstrain
-  this->state_variables_["strut_pastrain"] = pastrain;
+  this->strut_pstrain_(0) = pastrain;
   // Map particle traction forces to nodes
   for (unsigned i = 0; i < nodes_.size(); ++i)
     nodes_[i]->update_strut_force(true, mpm::ParticlePhase::Solid,

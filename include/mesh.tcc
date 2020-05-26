@@ -1954,8 +1954,7 @@ bool mpm::Mesh<Tdim>::apply_strut_step(const unsigned strut_id) {
     // Axial force
     double axial_force = 0;
     // Axial plastic strain
-    double pastrain =
-        map_particles_[strut_points(0)]->state_variable("strut_pastrain");
+    double pastrain = map_particles_[strut_points(0)]->strut_pastrain();
     // Compute axial force left
     if (astrain < 0) {
       // Compression positive

@@ -269,8 +269,7 @@ class ParticleBase {
   //! Return the approximate particle diameter
   virtual double diameter() const = 0;
 
-  virtual void add_state_variable(const std::string& var,
-                                  const double value) = 0;
+  virtual double strut_pastrain() const = 0;
 
  protected:
   //! particleBase id

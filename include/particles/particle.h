@@ -298,12 +298,7 @@ class Particle : public ParticleBase<Tdim> {
     if (Tdim == 3) return 2.0 * std::pow(volume_ * 0.75 / M_PI, (1 / 3));
   }
 
-  void add_state_variable(const std::string& var, const double value) override {
-    if (state_variables_.find(var) != state_variables_.end())
-      state_variables_.at(var) = value;
-    else
-      state_variables_.insert(std::make_pair(var, value));
-  }
+  double strut_pastrain() const override { return strut_pstrain_(0); }
 
  private:
   //! Compute strain rate
@@ -377,6 +372,8 @@ class Particle : public ParticleBase<Tdim> {
   std::map<std::string, std::function<Eigen::VectorXd()>> properties_;
   //! Strut force
   Eigen::Matrix<double, 6, 1> strut_force_;
+  //! Strut pastrain
+  Eigen::Matrix<double, 2, 1> strut_pstrain_;
 
 };  // Particle class
 }  // namespace mpm
