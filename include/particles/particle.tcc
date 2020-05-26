@@ -98,6 +98,10 @@ bool mpm::Particle<Tdim>::initialise_particle(const HDF5Particle& particle) {
   // Material id
   this->material_id_ = particle.material_id;
 
+  // Strut plastic strain
+  this->strut_pstrain_[0] = particle.strut_pastrain;
+  this->strut_pstrain_[1] = particle.strut_ptheta;
+
   return true;
 }
 
@@ -203,6 +207,10 @@ mpm::HDF5Particle mpm::Particle<Tdim>::hdf5() const {
   particle_data.cell_id = this->cell_id();
 
   particle_data.material_id = this->material_id();
+
+  // Strut plastic strain
+  particle_data.strut_pastrain = this->strut_pstrain_[0];
+  particle_data.strut_ptheta = this->strut_pstrain_[1];
 
   // Write state variables
   if (material_ != nullptr) {

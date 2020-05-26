@@ -34,6 +34,8 @@ const size_t dst_offset[NFIELDS] = {
     HOFFSET(HDF5Particle, status),
     HOFFSET(HDF5Particle, cell_id),
     HOFFSET(HDF5Particle, material_id),
+    HOFFSET(HDF5Particle, strut_pastrain),
+    HOFFSET(HDF5Particle, strut_ptheta),
     HOFFSET(HDF5Particle, nstate_vars),
     HOFFSET(HDF5Particle, svars[0]),
     HOFFSET(HDF5Particle, svars[1]),
@@ -92,6 +94,8 @@ const size_t dst_sizes[NFIELDS] = {
     sizeof(particle.status),
     sizeof(particle.cell_id),
     sizeof(particle.material_id),
+    sizeof(particle.strut_pastrain),
+    sizeof(particle.strut_ptheta),
     sizeof(particle.nstate_vars),
     sizeof(particle.svars[0]),
     sizeof(particle.svars[1]),
@@ -149,6 +153,8 @@ const char* field_names[NFIELDS] = {
     "status",
     "cell_id",
     "material_id",
+    "strut_pastrain",
+    "strut_ptheta",
     "nstate_vars",
     "svars_0",
     "svars_1",
@@ -182,11 +188,11 @@ const hid_t field_type[NFIELDS] = {
     H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE,
     H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE,
     H5T_NATIVE_DOUBLE, H5T_NATIVE_HBOOL,  H5T_NATIVE_LLONG,  H5T_NATIVE_UINT,
-    H5T_NATIVE_UINT,   H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE,
+    H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_UINT,   H5T_NATIVE_DOUBLE,
     H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE,
     H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE,
     H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE,
     H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE,
-    H5T_NATIVE_DOUBLE};
+    H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE, H5T_NATIVE_DOUBLE};
 }  // namespace hdf5::particle
 }  // namespace mpm

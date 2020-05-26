@@ -40,6 +40,8 @@ typedef struct HDF5Particle {
   bool status;
   // Material id
   unsigned material_id;
+  // Strut plastic strain
+  double strut_pastrain, strut_ptheta;
   // Number of state variables
   unsigned nstate_vars;
   // State variables (init to zero)
@@ -47,7 +49,7 @@ typedef struct HDF5Particle {
 } HDF5Particle;
 
 namespace hdf5::particle {
-const hsize_t NFIELDS = 53;
+const hsize_t NFIELDS = 55;
 
 const size_t dst_size = sizeof(HDF5Particle);
 
