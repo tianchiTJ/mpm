@@ -1888,13 +1888,30 @@ template <unsigned Tdim>
 bool mpm::Mesh<Tdim>::apply_remove_step(const unsigned sid) {
   bool status = false;
   try {
-    // Iterate over each particles in the set
-    for (auto particle = particle_sets_.at(sid).cbegin();
-         particle != particle_sets_.at(sid).cend(); particle++) {
-      // Remove particle from the mesh
-      status = this->remove_particle_by_id(*particle);
-      if (!status) throw std::runtime_error("Removing particle is invalid");
+
+    // Get MPI rank
+    int mpi_size = 1;
+#ifdef USE_MPI
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+#endif
+
+    // Get particle ids in set
+    auto pids = particle_sets_.at(sid);
+
+    for (auto& id : pids) {
+      map_particles_[id]->remove_cell();
+      map_particles_.remove(id);
     }
+
+    // Get number of particles to reserve size
+    unsigned nparticles = this->nparticles();
+    // Clear particles and start a new element of particles
+    particles_.clear();
+    particles_.reserve(static_cast<int>(nparticles / mpi_size));
+    // Iterate over the map of particles and add them to container
+    for (auto& particle : map_particles_)
+      particles_.add(particle.second, false);
+
   } catch (std::exception& exception) {
     console_->error("{} #{}: {}\n", __FILE__, __LINE__, exception.what());
     status = false;
