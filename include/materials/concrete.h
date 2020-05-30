@@ -76,6 +76,8 @@ class Concrete : public Material<Tdim> {
   double bulk_modulus_{std::numeric_limits<double>::max()};
   //! Tension strength
   double tension_strength_{std::numeric_limits<double>::max()};
+  //! Compression strength
+  double compression_strength_{std::numeric_limits<double>::max()};
 };  // Concrete class
 }  // namespace mpm
 

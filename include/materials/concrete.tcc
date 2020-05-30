@@ -10,6 +10,8 @@ mpm::Concrete<Tdim>::Concrete(unsigned id, const Json& material_properties)
         material_properties.at("poisson_ratio").template get<double>();
     tension_strength_ =
         material_properties.at("tension_strength").template get<double>();
+    compression_strength_ =
+        material_properties.at("compression_strength").template get<double>();
     // Calculate bulk modulus
     bulk_modulus_ = youngs_modulus_ / (3.0 * (1. - 2. * poisson_ratio_));
 
@@ -67,11 +69,12 @@ Eigen::Matrix<double, 6, 1> mpm::Concrete<Tdim>::compute_stress(
   Eigen::Matrix<double, 6, 1> updated_stress;
   updated_stress.setZero();
 
-  if (ptr->mass() > std::numeric_limits<double>::epsilon()) {
+  if ((*state_vars).at("broken") != std::numeric_limits<double>::max()) {
     // Compute update stress
     updated_stress = stress + this->de_ * dstrain;
     // Check tension failure
-    if (updated_stress.leftCols(Tdim).maxCoeff() > tension_strength_) {
+    if (updated_stress.leftCols(Tdim).maxCoeff() > tension_strength_ ||
+        updated_stress.leftCols(Tdim).maxCoeff() < compression_strength_) {
       // Set stress zero
       updated_stress.setZero();
       // Broken property
