@@ -11,7 +11,7 @@ mpm::Concrete<Tdim>::Concrete(unsigned id, const Json& material_properties)
     tension_strength_ =
         material_properties.at("tension_strength").template get<double>();
     compression_strength_ =
-        material_properties.at("compression_strength").template get<double>();
+        -material_properties.at("compression_strength").template get<double>();
     // Calculate bulk modulus
     bulk_modulus_ = youngs_modulus_ / (3.0 * (1. - 2. * poisson_ratio_));
 
