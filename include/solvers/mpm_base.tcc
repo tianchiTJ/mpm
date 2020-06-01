@@ -524,8 +524,7 @@ void mpm::MPMBase<Tdim>::write_vtk(mpm::Index step, mpm::Index max_steps) {
 #endif
 
   //! VTK vector variables
-  std::vector<std::string> vtk_vector_data = {"displacements", "velocities",
-                                              "material"};
+  std::vector<std::string> vtk_vector_data = {"displacements", "material"};
 
   // Write VTK attributes
   for (const auto& attribute : vtk_vector_data) {
@@ -549,8 +548,7 @@ void mpm::MPMBase<Tdim>::write_vtk(mpm::Index step, mpm::Index max_steps) {
   }
 
   //! VTK tensor variables
-  std::vector<std::string> vtk_tensor_data = {"stresses", "strains",
-                                              "strut_forces"};
+  std::vector<std::string> vtk_tensor_data = {"stresses", "strut_forces"};
 
   // Write VTK attributes
   for (const auto& attribute : vtk_tensor_data) {

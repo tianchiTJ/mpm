@@ -69,7 +69,7 @@ Eigen::Matrix<double, 6, 1> mpm::Concrete<Tdim>::compute_stress(
   Eigen::Matrix<double, 6, 1> updated_stress;
   updated_stress.setZero();
 
-  if ((*state_vars).at("broken") != std::numeric_limits<double>::max()) {
+  if ((*state_vars).at("broken") < 100) {
     // Compute update stress
     updated_stress = stress + this->de_ * dstrain;
     // Check tension failure
@@ -78,7 +78,7 @@ Eigen::Matrix<double, 6, 1> mpm::Concrete<Tdim>::compute_stress(
       // Set stress zero
       updated_stress.setZero();
       // Broken property
-      (*state_vars).at("broken") = std::numeric_limits<double>::max();
+      (*state_vars).at("broken") = 1000;
     }
   }
 
